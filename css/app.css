@@ -1,5 +1,6 @@
 /* Cadastro e Venda — estilos. Visual alinhado ao painel Pós-Corte:
-   cabeçalho em degradê azul claro, cards brancos com bolinha colorida, azul #364dd4 como cor de ação. */
+   cards brancos com bolinha colorida, azul #364dd4 como cor de ação. O cabeçalho é azul-marinho escuro,
+   para não se confundir com o do painel de Pós-Corte (azul claro). */
 
 :root {
   color-scheme: light;
@@ -14,9 +15,9 @@
   --accent: #364dd4;
   --accent-ink: #ffffff;
   --accent-wash: #ebf0fe;
-  --head-1: #e0eafd;
-  --head-2: #d8e5fb;
-  --logo: #5064da;
+  --head-1: #1c3a8f;
+  --head-2: #14296b;
+  --logo: rgba(255, 255, 255, .16);
   --c-cinza: #5d6675;
   --c-azul: #4176d4;
   --c-laranja: #e26d3c;
@@ -39,7 +40,7 @@
     color-scheme: dark;
     --bg: #0f131c; --surface: #171c27; --surface-2: #1f2532; --ink: #f2f5fb; --ink-2: #c3cada; --ink-3: #98a3b8;
     --line: #283041; --line-2: #36405a; --accent: #6f86f0; --accent-ink: #0b1020; --accent-wash: #1c2540;
-    --head-1: #1b2440; --head-2: #172036; --logo: #6f86f0; --barra: #2b3f7a;
+    --head-1: #17306f; --head-2: #0f2150; --logo: rgba(255, 255, 255, .16); --barra: #2b3f7a;
     --c-azul: #6a95ec; --c-laranja: #f0865a; --c-roxo: #8d79e0; --c-verde: #52c493; --c-azul-esc: #6f86f0; --c-claro: #4a5468;
     --good: #5bd0a0; --warn: #f0b84a; --crit: #f08080;
     --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 8px 24px rgba(0, 0, 0, .5);
@@ -49,7 +50,7 @@
   color-scheme: dark;
   --bg: #0f131c; --surface: #171c27; --surface-2: #1f2532; --ink: #f2f5fb; --ink-2: #c3cada; --ink-3: #98a3b8;
   --line: #283041; --line-2: #36405a; --accent: #6f86f0; --accent-ink: #0b1020; --accent-wash: #1c2540;
-  --head-1: #1b2440; --head-2: #172036; --logo: #6f86f0; --barra: #2b3f7a;
+  --head-1: #17306f; --head-2: #0f2150; --logo: rgba(255, 255, 255, .16); --barra: #2b3f7a;
   --c-azul: #6a95ec; --c-laranja: #f0865a; --c-roxo: #8d79e0; --c-verde: #52c493; --c-azul-esc: #6f86f0; --c-claro: #4a5468;
   --good: #5bd0a0; --warn: #f0b84a; --crit: #f08080;
   --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 8px 24px rgba(0, 0, 0, .5);
@@ -64,13 +65,13 @@ button, select, input { font: inherit; color: inherit; }
 .wrap { width: 100%; max-width: 1360px; margin: 0 auto; padding: 0 24px; }
 
 /* ---------- cabeçalho ---------- */
-.topo { background: linear-gradient(180deg, var(--head-1), var(--head-2)); border-bottom: 1px solid var(--line); }
+.topo { background: linear-gradient(180deg, var(--head-1), var(--head-2)); border-bottom: 1px solid rgba(0, 0, 0, .25); color: #fff; }
 .linha-topo { display: flex; align-items: center; gap: 16px; padding-top: 14px; padding-bottom: 10px; flex-wrap: wrap; }
 .marca { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1 1 320px; }
 .marca > div { min-width: 0; }
 .logo { flex: none; width: 36px; height: 36px; border-radius: 10px; background: var(--logo); display: grid; place-items: center; }
 .marca h1 { font-size: 18px; line-height: 1.2; margin: 0; font-weight: 700; letter-spacing: -.01em; }
-.marca small { display: block; color: var(--ink-3); font-size: 12.5px; margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.marca small { display: block; color: rgba(255, 255, 255, .78); font-size: 12.5px; margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .acoes { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
 
 .btn {
@@ -89,10 +90,18 @@ button, select, input { font: inherit; color: inherit; }
 .abas { display: flex; gap: 6px; overflow-x: auto; padding-top: 2px; }
 .abas button {
   appearance: none; background: transparent; border: 0; border-bottom: 3px solid transparent; padding: 10px 12px 9px; cursor: pointer;
-  color: var(--ink-3); font-weight: 600; white-space: nowrap;
+  color: rgba(255, 255, 255, .72); font-weight: 600; white-space: nowrap;
 }
-.abas button:hover { color: var(--ink); }
-.abas button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+.abas button:hover { color: #fff; }
+.abas button[aria-selected="true"] { color: #fff; border-bottom-color: #fff; }
+
+/* botões sobre o cabeçalho escuro */
+.topo .btn { background: rgba(255, 255, 255, .12); border-color: rgba(255, 255, 255, .3); color: #fff; box-shadow: none; }
+.topo .btn:hover { background: rgba(255, 255, 255, .22); }
+.topo .btn.primario { background: #fff; border-color: #fff; color: #14296b; }
+.topo .btn.primario:hover { background: #e8eeff; filter: none; }
+.topo .btn.fantasma { background: transparent; border-color: transparent; color: rgba(255, 255, 255, .82); }
+.topo .btn.fantasma:hover { background: rgba(255, 255, 255, .14); color: #fff; }
 
 /* ---------- estado vazio / mensagens ---------- */
 .vazio { padding: 40px 0 64px; }
@@ -247,6 +256,8 @@ code { font-family: var(--mono); font-size: 12px; background: var(--surface-2); 
 @media print {
   .acoes, .abas, .cartao-filtros, .mensagens, .chips .chip button, .mais { display: none !important; }
   .topo { background: none; border: 0; }
+  .marca h1, .marca small { color: #11172a !important; }
+  .logo { background: #364dd4; }
   .tabela-wrap { max-height: none; overflow: visible; }
   tr.servicos { display: table-row !important; }
   body { background: #fff; }
