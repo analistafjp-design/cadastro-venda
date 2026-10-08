@@ -291,6 +291,7 @@
         mat, projeto: v.projeto, recurso: v.recurso, cidade: v.cidade, bairro: v.bairro, setor: v.setor,
         endereco: v.endereco, ultimaVisita: v.data, motivo: v.motivo, tentativas,
         escalar: tentativas >= limite, chance: ch.taxa, baseChance: ch.base, qtdEcon: v.qtdEconRotulo,
+        visita: v, // a atividade em si, para exportar no formato de Atividades
       });
     }
     out.sort((a, b) => Number(a.escalar) - Number(b.escalar) || b.chance - a.chance || (a.ultimaVisita < b.ultimaVisita ? 1 : -1));
@@ -308,7 +309,7 @@
       if (idade <= dias) continue;
       out.push({
         mat: v.mat, projeto: v.projeto, recurso: v.recurso, cidade: v.cidade, bairro: v.bairro,
-        endereco: v.endereco, data: v.data, dias: idade, protocolo: v.protocolo,
+        endereco: v.endereco, data: v.data, dias: idade, protocolo: v.protocolo, visita: v,
       });
     }
     out.sort((a, b) => b.dias - a.dias);
@@ -332,7 +333,7 @@
       const u = vs[vs.length - 1];
       out.push({
         mat, projeto: u.projeto, recurso: u.recurso, cidade: u.cidade, bairro: u.bairro, endereco: u.endereco,
-        visitas: vs.length, primeiraVisita: vs[0].data, ultimaVisita: u.data,
+        visitas: vs.length, primeiraVisita: vs[0].data, ultimaVisita: u.data, visita: u,
       });
     }
     out.sort((a, b) => b.visitas - a.visitas || (a.ultimaVisita < b.ultimaVisita ? 1 : -1));

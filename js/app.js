@@ -418,14 +418,14 @@
   }
 
   /** Visitas do escopo com os filtros da tela. `comPeriodo: false` ignora as datas (listas de novos alvos). */
-  function filtrarVisitas(lista, comPeriodo) {
+  function filtrarVisitas(lista, comPeriodo, semTerritorio) {
     const f = estado.filtros;
     const base = M.filtrar(lista, {
       de: comPeriodo ? f.de : null,
       ate: comPeriodo ? f.ate : null,
-      semAvulsas: f.semAvulsas,
-      projetos: f.base ? new Set([f.base]) : null,
-      cidades: f.cidade ? new Set([f.cidade]) : null,
+      semAvulsas: semTerritorio ? false : f.semAvulsas,
+      projetos: !semTerritorio && f.base ? new Set([f.base]) : null,
+      cidades: !semTerritorio && f.cidade ? new Set([f.cidade]) : null,
     });
     return f.equipe ? base.filter((v) => chaveEquipe(v.recurso) === chaveEquipe(f.equipe)) : base;
   }
@@ -441,6 +441,15 @@
   }
 
   const equipesVisiveis = () => (estado.filtros.equipe ? [estado.filtros.equipe] : estado.opcoes.equipes);
+
+  /** Os tempos mostram só as equipes que trouxeram resultado no período (cidade e base não se aplicam). */
+  function equipesComResultado() {
+    const com = new Set();
+    for (const v of filtrarVisitas(estado.visitas, true, true)) {
+      if (v.grupoStatus === 'exec' && v.grupoRetorno === 'resultado') com.add(chaveEquipe(v.recurso));
+    }
+    return equipesVisiveis().filter((nome) => com.has(chaveEquipe(nome)));
+  }
 
   // ---------------------------------------------------------------- filtros
 
@@ -595,7 +604,7 @@
       });
     } else if (estado.aba === 'tempos') {
       CV.ui.renderTempos(alvo, {
-        agenda: agendaFiltrada(), equipes: equipesVisiveis(), modo: estado.modoTempos, ordemDe, soCompletos: estado.soCompletos,
+        agenda: agendaFiltrada(), equipes: equipesComResultado(), modo: estado.modoTempos, ordemDe, soCompletos: estado.soCompletos,
         aoMudarModo: (m) => { estado.modoTempos = m; renderPainel(); },
         aoMudarCompletos: (v) => { estado.soCompletos = v; renderPainel(); },
       });
@@ -616,13 +625,63 @@
     return estado.ordem[id];
   }
 
-  function exportarTabela(nome, colunas, linhas) {
-    const cols = colunas.map((c) => {
-      const fn = c.csv || c.valor;
-      if (c.tipo === 'taxa') return { titulo: c.titulo + ' (%)', valor: (l) => { const v = fn(l); return v === null || v === undefined ? '' : Math.round(v * 1000) / 10; } };
-      return { titulo: c.titulo, valor: fn };
-    });
-    CV.csv.baixar(nome, cols, linhas);
+  // ---- exportação (Excel, formato analítico como o de Atividades)
+
+  const hojeTxt = () => new Date().toISOString().slice(0, 10);
+
+  function periodoTxt() {
+    const f = estado.filtros;
+    return f.de && f.ate ? f.de + '_a_' + f.ate : f.de || f.ate || 'todo-o-periodo';
+  }
+
+  /** O recorte que gerou o arquivo, para ir junto na aba "Filtros". */
+  function descricaoFiltros(comTerritorio) {
+    const f = estado.filtros;
+    const p = [['Período', f.de || f.ate ? (f.de ? fmt.longa(f.de) : 'início') + ' a ' + (f.ate ? fmt.longa(f.ate) : 'último dia') : 'Todo o período']];
+    p.push(['Equipe', f.equipe || 'Todas as do escopo']);
+    if (comTerritorio !== false) {
+      p.push(['Cidade', f.cidade || 'Todas as do escopo']);
+      p.push(['Base', f.base || 'Todas']);
+      p.push(['Avulsas', f.semAvulsas ? 'Ocultas' : 'Incluídas']);
+    }
+    p.push(['Equipes do escopo', R.escopo.equipes.join(', ')]);
+    return p;
+  }
+
+  async function baixarExcel(nome, abas) {
+    const ov = sobreposicao('Gerando o arquivo Excel…');
+    try {
+      await pausa();
+      await CV.xlsxw.baixar(nome, abas);
+    } catch (e) {
+      console.error(e);
+      mensagem('erro', 'Não consegui gerar o arquivo Excel: ' + (e && e.message ? e.message : 'erro desconhecido') + '.');
+    } finally {
+      ov.fechar();
+    }
+  }
+
+  /** Visão geral e Auditoria: as visitas do recorte, uma linha por atividade. */
+  function exportarCruzamento() {
+    return baixarExcel('visitas_' + periodoTxt(), [CV.exporta.abaVisitas(visitasFiltradas()), CV.exporta.abaFiltros(descricaoFiltros(true))]);
+  }
+
+  /** Tempos: um dia de cada equipe e as atividades com horário. */
+  function exportarTempos() {
+    const ag = agendaFiltrada();
+    return baixarExcel('tempos-equipes_' + periodoTxt(), [CV.exporta.abaDias(ag), CV.exporta.abaAgenda(ag), CV.exporta.abaFiltros(descricaoFiltros(false))]);
+  }
+
+  /** Listas de novos alvos: a última atividade de cada alvo (formato Atividades) mais o que a lista calcula. */
+  function exportarLista(nome, linhas, extras) {
+    const aba = CV.exporta.abaVisitas(linhas, { visitaDe: (l) => l.visita, extras });
+    return baixarExcel(nome + '_' + hojeTxt(), [aba, CV.exporta.abaFiltros(descricaoFiltros(true))]);
+  }
+
+  function exportarAtual() {
+    if (estado.aba === 'tempos') return exportarTempos();
+    if (estado.aba === 'alvos' && estado.exportaAlvo) return estado.exportaAlvo();
+    return exportarCruzamento();
   }
 
   // ---- Novos alvos
@@ -653,13 +712,14 @@
       h('span', { class: 'espaco' })
     ));
 
-    const tabelaLista = (descricao, nomeCsv, cols, linhas, ordemId) => {
+    const tabelaLista = (descricao, nomeArq, cols, linhas, ordemId, extras) => {
+      estado.exportaAlvo = () => exportarLista(nomeArq, linhas, extras);
       alvo.appendChild(h('p', { class: 'nota', style: { margin: '0 0 10px' }, text: descricao }));
       alvo.appendChild(CV.ui.criarTabela({ colunas: cols, linhas, ordem: ordemDe(ordemId, { id: null, dir: 'desc' }), maxLinhas: 300, vazio: 'Nenhum alvo nesta lista com os filtros atuais.' }));
       alvo.appendChild(h('div', { class: 'cabeca', style: { marginTop: '10px' } },
         h('span', { class: 'nota', style: { margin: 0 }, text: linhas.length > 300 ? 'Mostrando os 300 primeiros — exporte para ver todos.' : '' }),
         h('span', { class: 'espaco' }),
-        h('button', { class: 'btn mini primario', text: 'Exportar lista (CSV)', disabled: !linhas.length, on: { click: () => exportarTabela(nomeCsv, cols, linhas) } })));
+        h('button', { class: 'btn mini primario', text: 'Exportar lista (Excel)', disabled: !linhas.length, on: { click: estado.exportaAlvo } })));
     };
 
     const colsLocal = [
@@ -674,32 +734,39 @@
     if (estado.subAlvos === 'revisitar') {
       tabelaLista(
         `Matrículas cuja última visita terminou com motivo recuperável (${Object.keys(R.motivos).filter((k) => R.motivos[k] === 'revisitar').map((k) => k.toLowerCase()).join(', ')}) e que não tiveram visita executada depois. Ordenadas pela chance estimada de resultado (taxa histórica do projeto × nº de economias). Alvos com ${R.limiteTentativas}+ tentativas vão para o fim da lista: escalar em vez de revisitar. Esta lista usa todo o histórico (ignora o filtro de período).`,
-        'alvos-revisitar.csv',
+        'alvos-revisitar',
         colsLocal.concat([
-          colTxt('data', 'Última visita', (l) => l.ultimaVisita, { render: (l) => fmt.longa(l.ultimaVisita), csv: (l) => fmt.longa(l.ultimaVisita) }),
+          colTxt('data', 'Última visita', (l) => l.ultimaVisita, { render: (l) => fmt.longa(l.ultimaVisita) }),
           colTxt('mot', 'Motivo', (l) => l.motivo || ''),
-          colNum('tent', 'Tentativas', (l) => l.tentativas, { render: (l) => [String(l.tentativas), l.escalar ? h('span', { class: 'etiqueta crit', text: 'escalar' }) : null], csv: (l) => l.tentativas }),
+          colNum('tent', 'Tentativas', (l) => l.tentativas, { render: (l) => [String(l.tentativas), l.escalar ? h('span', { class: 'etiqueta crit', text: 'escalar' }) : null] }),
           colTxt('eco', 'Nº economias', (l) => l.qtdEcon),
-          { id: 'ch', titulo: 'Chance estimada', tipo: 'taxa', valor: (l) => l.chance, csv: (l) => l.chance, dica: 'Taxa histórica de resultado do segmento: ' + R.minAmostraRanking + '+ visitas do mesmo projeto e nº de economias (ou o segmento mais próximo com amostra)' },
+          { id: 'ch', titulo: 'Chance estimada', tipo: 'taxa', valor: (l) => l.chance, dica: 'Taxa histórica de resultado do segmento: ' + R.minAmostraRanking + '+ visitas do mesmo projeto e nº de economias (ou o segmento mais próximo com amostra)' },
           colTxt('base', 'Base da estimativa', (l) => l.baseChance, { sem_ordem: true }),
           colEndereco,
         ]),
-        revisitar, 'alvos-revisitar');
+        revisitar, 'alvos-revisitar', [
+          { titulo: 'Tentativas (ocorrências)', tipo: 'num', valor: (l) => l.tentativas },
+          { titulo: 'Escalar', valor: (l) => (l.escalar ? 'Sim' : 'Não') },
+          { titulo: 'Chance estimada de resultado', tipo: 'pct', valor: (l) => l.chance },
+          { titulo: 'Base da estimativa', valor: (l) => l.baseChance },
+        ]);
     } else if (estado.subAlvos === 'endereco') {
       tabelaLista(
         'Última visita terminou em "endereço não localizado" / "ramal ou rede não localizado" e não houve visita executada depois. A ação é do backoffice: confirmar ou corrigir o endereço/coordenada antes de reagendar.',
-        'alvos-corrigir-endereco.csv',
+        'alvos-corrigir-endereco',
         colsLocal.concat([
-          colTxt('data', 'Última visita', (l) => l.ultimaVisita, { render: (l) => fmt.longa(l.ultimaVisita), csv: (l) => fmt.longa(l.ultimaVisita) }),
+          colTxt('data', 'Última visita', (l) => l.ultimaVisita, { render: (l) => fmt.longa(l.ultimaVisita) }),
           colTxt('mot', 'Motivo', (l) => l.motivo || ''),
           colNum('tent', 'Tentativas', (l) => l.tentativas),
           colEndereco,
         ]),
-        endereco, 'alvos-endereco');
+        endereco, 'alvos-endereco', [
+          { titulo: 'Tentativas (ocorrências)', tipo: 'num', valor: (l) => l.tentativas },
+        ]);
     } else if (estado.subAlvos === 'retorno') {
       tabelaLista(
         `Visitas executadas há mais de ${R.diasSemRetorno} dias (contados até o último retorno carregado, ${fmt.longa(estado.cruzado.dataReferencia)}) sem nenhum lançamento na planilha de Resultados. Ou o backoffice ainda não tratou, ou o lançamento foi feito com outra matrícula. Mais antigas primeiro.`,
-        'pendentes-de-retorno.csv',
+        'pendentes-de-retorno',
         [
           colTxt('mat', 'Matrícula', (l) => l.mat || '(inválida)'),
           colTxt('prot', 'Protocolo', (l) => l.protocolo || ''),
@@ -707,21 +774,27 @@
           colTxt('rec', 'Equipe', (l) => l.recurso),
           colTxt('cid', 'Cidade', (l) => l.cidade || ''),
           colTxt('bai', 'Bairro', (l) => l.bairro || ''),
-          colTxt('data', 'Visita', (l) => l.data, { render: (l) => fmt.longa(l.data), csv: (l) => fmt.longa(l.data) }),
+          colTxt('data', 'Visita', (l) => l.data, { render: (l) => fmt.longa(l.data) }),
           colNum('dias', 'Dias sem retorno', (l) => l.dias),
         ],
-        semRetorno, 'alvos-retorno');
+        semRetorno, 'alvos-retorno', [
+          { titulo: 'Dias sem retorno', tipo: 'num', valor: (l) => l.dias },
+        ]);
     } else if (estado.subAlvos === 'esgotados') {
       tabelaLista(
         'Matrículas com 2 ou mais visitas executadas em que todos os retornos foram "sem tratativa". Nova visita tende a repetir o resultado: retirar das próximas bases ou tratar de outra forma (ex.: contato telefônico).',
-        'alvos-esgotados.csv',
+        'alvos-esgotados',
         colsLocal.concat([
           colNum('vis', 'Visitas', (l) => l.visitas),
-          colTxt('pri', 'Primeira', (l) => l.primeiraVisita, { render: (l) => fmt.longa(l.primeiraVisita), csv: (l) => fmt.longa(l.primeiraVisita) }),
-          colTxt('ult', 'Última', (l) => l.ultimaVisita, { render: (l) => fmt.longa(l.ultimaVisita), csv: (l) => fmt.longa(l.ultimaVisita) }),
+          colTxt('pri', 'Primeira', (l) => l.primeiraVisita, { render: (l) => fmt.longa(l.primeiraVisita) }),
+          colTxt('ult', 'Última', (l) => l.ultimaVisita, { render: (l) => fmt.longa(l.ultimaVisita) }),
           colEndereco,
         ]),
-        esgotados, 'alvos-esgotados');
+        esgotados, 'alvos-esgotados', [
+          { titulo: 'Visitas executadas', tipo: 'num', valor: (l) => l.visitas },
+          { titulo: 'Primeira visita', tipo: 'data', valor: (l) => l.primeiraVisita },
+          { titulo: 'Última visita', tipo: 'data', valor: (l) => l.ultimaVisita },
+        ]);
     } else {
       renderOndeAtuar(alvo, vs);
     }
@@ -751,30 +824,29 @@
       colTxt('dim', nomeDim, (l) => l.chave),
       colNum('exec', 'Executadas', (l) => l.exec),
       colNum('res', 'Resultado', (l) => l.resultado),
-      { id: 'taxa', titulo: '% Resultado', tipo: 'taxa', valor: (l) => l.taxaResultado, csv: (l) => l.taxaResultado },
-      colNum('ind', 'Índice', (l) => l.indice, { render: (l) => fmt.ind(l.indice), csv: (l) => l.indice }),
+      { id: 'taxa', titulo: '% Resultado', tipo: 'taxa', valor: (l) => l.taxaResultado },
+      colNum('ind', 'Índice', (l) => l.indice, { render: (l) => fmt.ind(l.indice) }),
       colNum('de', 'Δ economias', (l) => l.deltaEcon, { render: (l) => fmt.sinal(l.deltaEcon) }),
       colTxt('lei', 'Leitura', (l) => leitura(l), {
         render: (l) => (leitura(l) === 'alta' ? h('span', { class: 'etiqueta alta', text: '▲ priorizar' }) : leitura(l) === 'baixa' ? h('span', { class: 'etiqueta baixa', text: '▼ rever' }) : ''),
-        csv: (l) => (leitura(l) === 'alta' ? 'priorizar' : leitura(l) === 'baixa' ? 'rever' : ''),
       }),
     ];
     alvo.appendChild(CV.ui.criarTabela({ colunas: cols, linhas: t.linhas, ordem: ordemDe('onde-' + estado.dimTerr, { id: 'taxa', dir: 'desc' }), maxLinhas: 300, vazio: 'Nenhum grupo atinge a amostra mínima neste recorte.' }));
+    // exporta as atividades dos grupos que aparecem na tabela, com a leitura do grupo ao lado
+    const porChave = new Map(t.linhas.map((l) => [l.chave, l]));
+    const linhasV = vs.map((v) => ({ visita: v, grupo: porChave.get(fn(v)) })).filter((x) => x.grupo);
+    const extras = [
+      { titulo: nomeDim + ' (grupo)', valor: (l) => l.grupo.chave },
+      { titulo: 'Taxa de resultado do grupo', tipo: 'pct', valor: (l) => l.grupo.taxaResultado },
+      { titulo: 'Índice do grupo', tipo: 'num', valor: (l) => (l.grupo.indice === null ? null : Math.round(l.grupo.indice * 100) / 100) },
+      { titulo: 'Leitura', valor: (l) => (leitura(l.grupo) === 'alta' ? 'priorizar' : leitura(l.grupo) === 'baixa' ? 'rever' : '') },
+    ];
+    estado.exportaAlvo = () => exportarLista('onde-atuar-' + estado.dimTerr, linhasV, extras);
     alvo.appendChild(h('div', { class: 'cabeca', style: { marginTop: '10px' } }, h('span', { class: 'espaco' }),
-      h('button', { class: 'btn mini primario', text: 'Exportar (CSV)', disabled: !t.linhas.length, on: { click: () => exportarTabela('onde-atuar-' + estado.dimTerr + '.csv', cols, t.linhas) } })));
+      h('button', { class: 'btn mini primario', text: 'Exportar (Excel)', disabled: !t.linhas.length, on: { click: estado.exportaAlvo } })));
   }
 
   // ---- Auditoria
-
-  /** Como um tipo de atividade entra na conta dos tempos. */
-  function classeDoTipo(tipo) {
-    const k = N.chave(tipo);
-    const em = (lista) => lista.some((t) => N.chave(t) === k);
-    if (em(R.tempos.tiposDeslocamento)) return 'Deslocamento';
-    if (em(R.tempos.tiposOciosos)) return 'Ociosidade';
-    if (em(R.tempos.tiposApoio)) return 'Pausas e apoio';
-    return 'Serviço';
-  }
 
   function topo(mapa, limite) {
     return Array.from(mapa.entries()).sort((a, b) => b[1] - a[1]).slice(0, limite).map(([k, n]) => k + ' (' + fmt.int(n) + ')').join(', ');
@@ -874,7 +946,7 @@
     const tipos = CV.tempos.tiposPresentes(estado.agenda);
     if (tipos.size) {
       alvo.appendChild(h('h3', { text: 'Tipos de atividade das equipes (tempos)' }));
-      const linhas = Array.from(tipos.entries()).map(([tipo, n]) => ({ tipo, n, classe: classeDoTipo(tipo) }));
+      const linhas = Array.from(tipos.entries()).map(([tipo, n]) => ({ tipo, n, classe: CV.tempos.classeDoTipo(tipo) }));
       alvo.appendChild(CV.ui.criarTabela({
         colunas: [
           colTxt('tipo', 'Tipo de atividade', (l) => l.tipo),
@@ -905,35 +977,9 @@
     }
     if (ignoradosPasta) alvo.appendChild(h('p', { class: 'nota', text: ignoradosPasta + ' outra(s) planilha(s) da pasta não são de Atividades nem de Resultados e foram ignoradas.' }));
     alvo.appendChild(h('div', { class: 'cabeca', style: { marginTop: '16px' } }, h('span', { class: 'espaco' }),
-      h('button', { class: 'btn mini', text: 'Baixar cruzamento completo (CSV, com os filtros atuais)', on: { click: exportarCruzamento } })));
+      h('button', { class: 'btn mini', text: 'Baixar o cruzamento completo (Excel, com os filtros atuais)', on: { click: exportarCruzamento } })));
   }
 
-  function exportarCruzamento() {
-    const vs = visitasFiltradas();
-    const nomeClasse = (id) => (R.classes.find((c) => c.id === id) || { curto: id }).curto;
-    const cols = [
-      { titulo: 'Data da visita', valor: (v) => fmt.longa(v.data) },
-      { titulo: 'Matrícula', valor: (v) => v.mat || '' },
-      { titulo: 'ID da atividade', valor: (v) => v.id },
-      { titulo: 'Protocolo', valor: (v) => v.protocolo || '' },
-      { titulo: 'Equipe', valor: (v) => v.recurso },
-      { titulo: 'Projeto', valor: (v) => v.projeto },
-      { titulo: 'Status', valor: (v) => v.status || '' },
-      { titulo: 'Motivo de não execução', valor: (v) => v.motivo || '' },
-      { titulo: 'Cidade', valor: (v) => v.cidade || '' },
-      { titulo: 'Bairro', valor: (v) => v.bairro || '' },
-      { titulo: 'Setor', valor: (v) => v.setor || '' },
-      { titulo: 'Categoria', valor: (v) => v.categoria || '' },
-      { titulo: 'Nº de economias', valor: (v) => v.qtdEconRotulo },
-      { titulo: 'Retornos', valor: (v) => v.nRetornos },
-      { titulo: 'Grupo do retorno', valor: (v) => ({ resultado: 'Resultado', atualizacao: 'Atualização', sem: 'Sem tratativa' }[v.grupoRetorno] || (v.grupoStatus === 'exec' ? 'Sem retorno' : '')) },
-      { titulo: 'Desfechos', valor: (v) => v.tags.map(nomeClasse).join(' + ') },
-      { titulo: 'Δ economias', valor: (v) => v.deltaEcon || 0 },
-      { titulo: 'Primeiro retorno', valor: (v) => fmt.longa(v.primeiroRetorno) },
-      { titulo: 'Dias até o retorno', valor: (v) => (v.primeiroRetorno ? N.diasEntre(v.data, v.primeiroRetorno) : '') },
-    ];
-    CV.csv.baixar('cruzamento-visitas-retornos.csv', cols, vs);
-  }
   // ---------------------------------------------------------------- inicialização
 
   function ligarEntrada() {
@@ -950,7 +996,7 @@
     $('btn-pasta').addEventListener('click', cliquePasta);
     $('btn-escolher-pasta').addEventListener('click', cliquePasta);
     $('btn-trocar-pasta').addEventListener('click', escolherPasta);
-    $('btn-exportar').addEventListener('click', exportarCruzamento);
+    $('btn-exportar').addEventListener('click', exportarAtual);
     $('btn-pdf').addEventListener('click', () => window.print());
     $('btn-limpar').addEventListener('click', limparTudo);
     let nivel = 0;

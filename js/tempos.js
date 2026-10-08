@@ -24,6 +24,16 @@
     return { apoio: set(T.tiposApoio), ocioso: set(T.tiposOciosos), desloc: set(T.tiposDeslocamento), semTempo: set(T.statusSemTempo) };
   }
 
+  /** Como um tipo de atividade entra na conta: 'Deslocamento' | 'Pausas e apoio' | 'Ociosidade' | 'Serviço'. */
+  function classeDoTipo(tipo) {
+    const c = conjuntos();
+    const k = N().chave(tipo);
+    if (c.desloc.has(k)) return 'Deslocamento';
+    if (c.ocioso.has(k)) return 'Ociosidade';
+    if (c.apoio.has(k)) return 'Pausas e apoio';
+    return 'Serviço';
+  }
+
   /** Atividades de equipes do escopo, com horário, prontas para somar. */
   function agendaDe(limpas) {
     const out = [];
@@ -72,7 +82,7 @@
     if (!n) return null;
     const dia = Math.max(0, fim - ini);
     const ocioso = Math.max(0, dia - desloc - servico - apoio - ociosoTipo) + ociosoTipo;
-    return { dia, desloc, servico, apoio, ocioso, atividades: n, completo };
+    return { inicio: ini, fim, dia, desloc, servico, apoio, ocioso, atividades: n, completo };
   }
 
   /**
@@ -114,6 +124,23 @@
     return linhas;
   }
 
+  /** Um dia de cada equipe (para exportar): [{ recurso, data, completo, inicio, fim, dia, desloc, servico, apoio, ocioso }]. */
+  function diasDaEquipe(agenda) {
+    const dias = new Map(); // "recurso|data" -> atividades
+    for (const a of agenda) {
+      const k = a.recurso + '|' + a.data;
+      if (!dias.has(k)) dias.set(k, { recurso: a.recurso, data: a.data, ats: [] });
+      dias.get(k).ats.push(a);
+    }
+    const out = [];
+    for (const d of dias.values()) {
+      const r = calcularDia(d.ats);
+      if (r) out.push(Object.assign({ recurso: d.recurso, data: d.data }, r));
+    }
+    out.sort((a, b) => a.recurso.localeCompare(b.recurso, 'pt-BR') || (a.data < b.data ? -1 : a.data > b.data ? 1 : 0));
+    return out;
+  }
+
   /** Tipos de atividade presentes (para avisar quando só há visitas cadastrais, sem refeição etc.). */
   function tiposPresentes(agenda) {
     const m = new Map();
@@ -121,6 +148,6 @@
     return m;
   }
 
-  CV.tempos = { agendaDe, calcularDia, porEquipe, tiposPresentes };
+  CV.tempos = { agendaDe, calcularDia, porEquipe, diasDaEquipe, classeDoTipo, tiposPresentes };
   if (typeof module !== 'undefined' && module.exports) module.exports = CV.tempos;
 })(typeof window !== 'undefined' ? window : globalThis);

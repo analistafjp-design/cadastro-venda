@@ -85,7 +85,7 @@
     alvo.appendChild(blocoBase);
 
     // ------------------------------------------------------------- Resultado por equipe
-    const equipes = M().resultadoPorEquipe(ctx.vs, ctx.equipes);
+    const equipes = M().resultadoPorEquipe(ctx.vs, ctx.equipes).filter((e) => e.resultado > 0); // só quem trouxe resultado
     const maxTaxa = equipes.reduce((m, e) => Math.max(m, e.taxa || 0), 0);
     const maxServico = (e) => e.tipos.reduce((m, t) => Math.max(m, t.n), 0);
     const corpo = h('tbody');
@@ -120,13 +120,17 @@
         celulaTaxa(e.taxa, maxTaxa)));
       corpo.appendChild(linhaServicos);
     }
-    const blocoEq = bloco('Resultado por equipe', 'Só o que trouxe resultado, por equipe do cadastro (RIORECIN) e da venda (RIOVENIN). Use o “+” sob o nome para abrir os serviços e as quantidades.');
-    blocoEq.appendChild(h('div', { class: 'tabela-wrap' }, h('table', { class: 'tab' },
-      h('thead', null, h('tr', null,
-        h('th', { class: 'txt sem-ordem', text: 'Equipe' }),
-        h('th', { class: 'sem-ordem', text: 'Com resultados' }),
-        h('th', { class: 'sem-ordem', text: '% de resultado', title: 'Com resultados ÷ Exec da equipe' }))),
-      corpo)));
+    const blocoEq = bloco('Resultado por equipe', 'Só as equipes que trouxeram resultado no período, do cadastro (RIORECIN) e da venda (RIOVENIN). Use o “+” sob o nome para abrir os serviços e as quantidades.');
+    if (equipes.length) {
+      blocoEq.appendChild(h('div', { class: 'tabela-wrap' }, h('table', { class: 'tab' },
+        h('thead', null, h('tr', null,
+          h('th', { class: 'txt sem-ordem', text: 'Equipe' }),
+          h('th', { class: 'sem-ordem', text: 'Com resultados' }),
+          h('th', { class: 'sem-ordem', text: '% de resultado', title: 'Com resultados ÷ Exec da equipe' }))),
+        corpo)));
+    } else {
+      blocoEq.appendChild(h('p', { class: 'nota', text: 'Nenhuma equipe trouxe resultado neste período. Se for um dia recente, os retornos do backoffice ainda estão chegando (em maturação).' }));
+    }
     alvo.appendChild(blocoEq);
 
     // ------------------------------------------------------------- Por data
@@ -158,6 +162,8 @@
   // ======================================================================= Tempos das equipes
 
   const CORES_TEMPO = { desloc: 'var(--c-azul)', servico: 'var(--c-verde)', apoio: 'var(--c-claro)', ocioso: 'var(--c-laranja)' };
+  const TEXTO_TEMPO = { desloc: '#fff', servico: '#fff', apoio: 'var(--ink)', ocioso: '#1b1f2a' };
+  const NOMES_TEMPO = { desloc: 'Deslocamento', servico: 'Serviço', apoio: 'Pausas e apoio', ocioso: 'Ociosidade' };
 
   /**
    * ctx: { agenda (já filtrada por período/equipe), equipes (nomes do escopo), modo: 'media'|'total',
@@ -194,16 +200,22 @@
           if (!l.dias || !l.total.dia) return '';
           const t = l.total;
           const pc = (v) => Math.max(0, (v / t.dia) * 100);
-          return h('div', { class: 'dist', title: ['Deslocamento', 'Serviço', 'Pausas e apoio', 'Ociosidade'].map((n, i) => n + ' ' + fmt.pct([t.desloc, t.servico, t.apoio, t.ocioso][i] / t.dia)).join(' · ') },
-            ['desloc', 'servico', 'apoio', 'ocioso'].map((k) => h('i', { style: { width: pc(t[k]) + '%', background: CORES_TEMPO[k] } })));
+          // rótulo visível dentro de cada trecho (só onde cabe); o detalhe completo fica na dica
+          return h('div', { class: 'dist', title: ['desloc', 'servico', 'apoio', 'ocioso'].map((k) => NOMES_TEMPO[k] + ' ' + fmt.pct(t[k] / t.dia)).join(' · ') },
+            ['desloc', 'servico', 'apoio', 'ocioso'].map((k) => h('i', { style: { width: pc(t[k]) + '%', background: CORES_TEMPO[k], color: TEXTO_TEMPO[k] }, text: pc(t[k]) >= 7 ? Math.round(pc(t[k])) + '%' : null })));
         },
       },
     ];
     const blocoT = bloco('Tempos das equipes',
-      'Deslocamento, serviço e ociosidade de cada equipe, em horas:minutos. ' + (ctx.modo === 'media' ? 'Média por dia trabalhado.' : 'Soma no período.'),
+      'Das equipes que trouxeram resultado no período: deslocamento, serviço e ociosidade, em horas:minutos. ' + (ctx.modo === 'media' ? 'Média por dia trabalhado.' : 'Soma no período.'),
       h('div', { class: 'grupo-seg' },
         segmentado([['completos', 'Dias completos'], ['todos', 'Todos os dias']], ctx.soCompletos ? 'completos' : 'todos', (v) => ctx.aoMudarCompletos(v === 'completos'), 'Dias considerados'),
         segmentado([['media', 'Média por dia'], ['total', 'Total no período']], ctx.modo, ctx.aoMudarModo, 'Medida')));
+    if (!linhas.length) {
+      blocoT.appendChild(h('p', { class: 'nota', text: 'Nenhuma equipe trouxe resultado neste período. Se for um dia recente, os retornos do backoffice ainda estão chegando (em maturação).' }));
+      alvo.appendChild(blocoT);
+      return;
+    }
     blocoT.appendChild(ui.criarTabela({ colunas: cols, linhas, ordem: ctx.ordemDe('tempos', { id: 'equipe', dir: 'asc' }), vazio: 'Sem atividades com horário no período.' }));
     blocoT.appendChild(h('div', { class: 'legenda' }, [
       ['desloc', 'Deslocamento'], ['servico', 'Serviço'], ['apoio', 'Pausas e apoio'], ['ocioso', 'Ociosidade'],

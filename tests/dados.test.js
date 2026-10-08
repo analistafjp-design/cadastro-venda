@@ -2,7 +2,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 require('./helpers');
-require('../js/csv.js');
 
 test('limpar atividades: normaliza matrícula, data, quantidade de economias e descarta o que não serve', () => {
   const r = CV.dados.limparAtividades([
@@ -57,18 +56,4 @@ test('resultados: limpar usa a data de início e cai para a de conclusão', () =
   assert.equal(r.limpas[1].mat, null);
   assert.equal(r.limpas[1].matBruta, '7654321');
   assert.equal(r.descartes.semId, 1);
-});
-
-test('csv: separador ;, vírgula decimal, aspas, BOM e proteção contra fórmulas', () => {
-  const csv = CV.csv.gerar(
-    [{ titulo: 'Nome', valor: (l) => l.a }, { titulo: 'Taxa', valor: (l) => l.b }],
-    [{ a: 'com;ponto e vírgula', b: 0.5 }, { a: 'aspas "x"', b: 12 }, { a: '=SOMA(A1)', b: null }, { a: '-', b: 1 }]
-  );
-  assert.equal(csv.charCodeAt(0), 0xfeff);
-  const linhas = csv.slice(1).trim().split('\r\n');
-  assert.equal(linhas[0], 'Nome;Taxa');
-  assert.equal(linhas[1], '"com;ponto e vírgula";0,5');
-  assert.equal(linhas[2], '"aspas ""x""";12');
-  assert.equal(linhas[3], "'=SOMA(A1);"); // não vira fórmula no Excel
-  assert.equal(linhas[4], "'-;1");
 });

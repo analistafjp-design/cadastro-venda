@@ -175,6 +175,14 @@ Calculados por equipe e por dia, em minutos, com as atividades que têm horário
 
 A aba mostra a **média por dia trabalhado** ou o **total do período**. Como o almoço e as paradas só existem na exportação completa do sistema, um dia só com visitas deixaria essas pausas virarem ociosidade: por isso o padrão é contar só os **dias completos** (dias em que a equipe tem também atividades que não são visita) e há a opção *Todos os dias*. Quais tipos são apoio, e se algum conta como ocioso (`tiposOciosos`), está em `regras.js`.
 
+## 6.2 Quais equipes aparecem
+
+*Resultado por equipe* (Visão geral) e *Tempos das equipes* mostram **só as equipes com resultado maior que zero no período e nos filtros** — equipe sem resultado some desses visuais (e volta quando houver). Isso vale só para os visuais: os cards, as bases e a exportação continuam contando todas as visitas do recorte.
+
+## 6.3 Exportação (Excel)
+
+Todo arquivo exportado é `.xlsx`, uma linha por atividade, com as colunas da planilha de Atividades (`Recurso`, `Data`, `ID da Atividade`, `Cód. Protocolo Origem`, `Matrícula`, `Status da Atividade`, `Tipo de Atividade`, `Observação`, `Cidade`, `Bairro`, `Área de Trabalho`, `Endereço`, `Motivo de Não Execução - Normal`, `Categoria`, `Quantidade De Economia`, `Situação Do Imóvel`, `Início`, `Fim`, `Duração`, `Tempo de Deslocamento`) mais: `Projeto (base)`, `Situação da visita`, `Percorrido`, `Retornos do backoffice`, `Grupo do retorno`, `Com resultado`, `Tipo de resultado`, `Desfechos do retorno`, `Δ economias`, `Data do 1º retorno`, `Dias até o retorno` e `Em maturação`. Datas e horários saem como data/hora do Excel, matrícula e ID como número, texto sempre como texto. A aba *Filtros* guarda o período, a equipe, a cidade e a base usados.
+
 ## 7. Listas de novos alvos
 
 | Lista | Regra |
