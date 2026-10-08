@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Acompanhamento Cadastro e Venda</title>
+  <meta name="description" content="Acompanhamento diário da efetividade das equipes de cadastro e venda: cruza as atividades visitadas com os retornos do backoffice pela matrícula.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23256abf'/%3E%3Cpath d='M7 22V14M13 22V10M19 22V16M25 22V7' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <header class="topo">
+    <div class="wrap">
+      <div class="marca">
+        <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="var(--accent)"/><path d="M7 22V14M13 22V10M19 22V16M25 22V7" stroke="var(--accent-ink)" stroke-width="3" stroke-linecap="round"/></svg>
+        <div>
+          <h1>Acompanhamento Cadastro e Venda</h1>
+          <small id="sub-topo">Nenhum dado carregado</small>
+        </div>
+      </div>
+      <div class="acoes">
+        <button class="btn primario" id="btn-adicionar" type="button">Escolher arquivos</button>
+        <button class="btn" id="btn-exportar" type="button" hidden>Exportar cruzamento (CSV)</button>
+        <button class="btn fantasma" id="btn-limpar" type="button" hidden>Limpar dados</button>
+        <input id="arquivo" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple hidden>
+      </div>
+    </div>
+  </header>
+
+  <div class="wrap"><div id="mensagens" class="mensagens" aria-live="polite"></div></div>
+
+  <noscript><div class="wrap"><p class="msg erro">Este painel precisa de JavaScript ativado.</p></div></noscript>
+
+  <main>
+    <section id="vazio" class="vazio wrap">
+      <div class="caixa" id="caixa">
+        <h2>Arraste as planilhas aqui</h2>
+        <p>Solte a planilha de <b>Atividades</b> (alvos visitados) e a de <b>Resultados</b> (retornos do backoffice). O app reconhece cada uma sozinho e cruza as duas pela matrícula.</p>
+        <button class="btn primario" id="btn-escolher" type="button">Escolher arquivos (.xlsx)</button>
+        <div class="tipos">
+          <div><b>Atividades</b><span>Exportação do sistema de campo ou a planilha "Cadastrais". Usa: Recurso, ID da Atividade, Matrícula, Data, Status, Observação (nome do projeto), Cidade, Bairro, Área de Trabalho, Motivo de Não Execução, Categoria, Quantidade de Economia.</span></div>
+          <div><b>Resultados</b><span>Planilha do formulário do backoffice. Usa: Id, Hora de início, Matrícula s/ dígito, Frente de Serviço, Tipo de Ordem de Serviço, Alteração de Economia, DE/PARA, Tratativa Cadastral, Tipo de Alteração.</span></div>
+        </div>
+        <p class="privacidade">Os arquivos são lidos aqui, no seu navegador. Nada é enviado para a internet. Os dados ficam guardados só neste computador, para você ir acrescentando um arquivo por dia.</p>
+      </div>
+    </section>
+
+    <div id="app" hidden>
+      <div class="filtros"><div class="wrap" id="filtros-conteudo"></div></div>
+      <div class="wrap">
+        <section id="resumo" class="resumo" aria-label="Resumo do período"></section>
+        <nav id="abas" class="abas" role="tablist" aria-label="Seções"></nav>
+        <section id="painel" class="painel" role="tabpanel"></section>
+      </div>
+    </div>
+  </main>
+
+  <script src="js/normalize.js"></script>
+  <script src="js/regras.js"></script>
+  <script src="js/zip.js"></script>
+  <script src="js/xlsx.js"></script>
+  <script src="js/projetos.js"></script>
+  <script src="js/resultados.js"></script>
+  <script src="js/dados.js"></script>
+  <script src="js/cruzamento.js"></script>
+  <script src="js/metricas.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/csv.js"></script>
+  <script src="js/ui-util.js"></script>
+  <script src="js/ui-tabela.js"></script>
+  <script src="js/ui-grafico.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
