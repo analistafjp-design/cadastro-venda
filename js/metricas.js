@@ -68,6 +68,7 @@
       for (const t of v.tags) r.classes[t]++;
       for (const c of R.colunasDesfecho) if (c.classes.some((t) => v.tags.indexOf(t) >= 0)) r.colunas[c.id]++;
     }
+    r.percorrido = r.exec + r.oc; // visitas em que a equipe foi ao local: executadas + ocorrências
     r.matriculas = mats.size;
     r.taxaExec = div(r.exec, r.total);
     r.taxaRetorno = div(r.comRetorno, r.exec);
@@ -106,50 +107,6 @@
   }
 
   /**
-   * Resultado por equipe e por período (dia/semana/mês), pela data da visita.
-   * Colunas do período mais recente para o mais antigo. Só conta visitas executadas.
-   */
-  function matrizPeriodos(visitas, granularidade) {
-    const chaveDe = chavePeriodo(granularidade);
-    const periodos = Array.from(new Set(visitas.map(chaveDe))).sort().reverse();
-    const porEquipe = new Map();
-    const total = { exec: 0, resultado: 0, celulas: new Map() };
-    const somar = (cel, v) => {
-      cel.exec++;
-      if (v.grupoRetorno === 'resultado') cel.resultado++;
-      if (v.maturando) cel.maturando++;
-    };
-    const nova = () => ({ exec: 0, resultado: 0, maturando: 0 });
-    for (const v of visitas) {
-      if (v.grupoStatus !== 'exec') continue;
-      let e = porEquipe.get(v.recurso);
-      if (!e) { e = { recurso: v.recurso, tipo: v.equipe, exec: 0, resultado: 0, celulas: new Map() }; porEquipe.set(v.recurso, e); }
-      const k = chaveDe(v);
-      if (!e.celulas.has(k)) e.celulas.set(k, nova());
-      if (!total.celulas.has(k)) total.celulas.set(k, nova());
-      somar(e.celulas.get(k), v);
-      somar(total.celulas.get(k), v);
-      e.exec++;
-      total.exec++;
-      if (v.grupoRetorno === 'resultado') { e.resultado++; total.resultado++; }
-    }
-    const montar = (e) => ({
-      recurso: e.recurso,
-      tipo: e.tipo,
-      exec: e.exec,
-      resultado: e.resultado,
-      taxa: div(e.resultado, e.exec),
-      celulas: periodos.map((k) => {
-        const c = e.celulas.get(k) || nova();
-        return { chave: k, exec: c.exec, resultado: c.resultado, taxa: div(c.resultado, c.exec), maturando: c.maturando };
-      }),
-    });
-    const linhas = Array.from(porEquipe.values()).map(montar);
-    linhas.sort((a, b) => b.exec - a.exec || a.recurso.localeCompare(b.recurso, 'pt-BR'));
-    return { periodos, linhas, total: montar({ recurso: 'Todas as equipes', tipo: null, exec: total.exec, resultado: total.resultado, celulas: total.celulas }) };
-  }
-
-  /**
    * O que são as atividades "sem projeto" (demandas avulsas): agrupa pelos 3 primeiros
    * termos do texto de abertura, com um exemplo de cada grupo.
    */
@@ -166,24 +123,91 @@
     return Array.from(grupos.values()).sort((a, b) => b.n - a.n).slice(0, limite || 8);
   }
 
-  /** Matriz equipe × projeto: taxa de resultado e volume de cada célula. */
-  function matriz(visitas, projetosOrdem, recursosOrdem) {
-    const cel = new Map();
+  // ---------- tipos de resultado (cards e resultado por equipe) ----------
+
+  /** Os "serviços" que trazem resultado, na ordem em que aparecem nas telas. */
+  const TIPOS_RESULTADO = [
+    { id: 'inc', rotulo: 'Incremento de economia' },
+    { id: 'inc_cat', rotulo: 'Incremento de economia e alteração de categoria' },
+    { id: 'cat', rotulo: 'Alteração de categoria' },
+    { id: 'titular', rotulo: 'Troca de titularidade' },
+    { id: 'tarifa', rotulo: 'Tarifa social' },
+    { id: 'fatura', rotulo: 'Fatura digital' },
+    { id: 'venda', rotulo: 'Venda / ligação nova' },
+    { id: 'debitos', rotulo: 'Negociação de débitos' },
+    { id: 'decr', rotulo: 'Decremento de economia' },
+    { id: 'eco', rotulo: 'Alteração de economia' },
+  ];
+
+  /**
+   * Em quais "tipos de resultado" uma visita se encaixa (pode ser mais de um).
+   * Economia + categoria no mesmo retorno = "incremento de economia e alteração de categoria".
+   */
+  function tiposDoResultado(v) {
+    const t = new Set(v.tags);
+    const inc = t.has('incremento');
+    const eco = t.has('economia');
+    const cat = t.has('categoria');
+    const out = [];
+    if (inc && !cat) out.push('inc');
+    if (cat && (inc || eco)) out.push('inc_cat');
+    if (cat && !inc && !eco) out.push('cat');
+    if (t.has('titularidade')) out.push('titular');
+    if (t.has('tarifa_social')) out.push('tarifa');
+    if (t.has('fatura')) out.push('fatura');
+    if (t.has('venda')) out.push('venda');
+    if (t.has('debitos')) out.push('debitos');
+    if (t.has('decremento')) out.push('decr');
+    if (eco && !cat && !inc) out.push('eco');
+    return out;
+  }
+
+  /** Visitas executadas com resultado. */
+  const comResultado = (visitas) => visitas.filter((v) => v.grupoStatus === 'exec' && v.grupoRetorno === 'resultado');
+
+  /** Os números dos cards da visão geral. */
+  function cartoes(visitas) {
+    const r = resumo(visitas);
+    const c = { percorrido: r.percorrido, exec: r.exec, oc: r.oc, resultado: r.resultado, taxa: r.taxaResultado, inc: 0, incCat: 0, totalInc: 0, totalCat: 0, titular: 0, outros: 0 };
+    for (const v of comResultado(visitas)) {
+      const tp = new Set(tiposDoResultado(v));
+      if (tp.has('inc')) c.inc++;
+      if (tp.has('inc_cat')) c.incCat++;
+      if (tp.has('inc') || tp.has('inc_cat')) c.totalInc++;
+      if (tp.has('cat') || tp.has('inc_cat')) c.totalCat++;
+      if (tp.has('titular')) c.titular++;
+      if (!['inc', 'inc_cat', 'cat', 'titular'].some((k) => tp.has(k))) c.outros++;
+    }
+    return c;
+  }
+
+  /**
+   * Resultado por equipe: só o que trouxe resultado, com os serviços (tipos) e a quantidade.
+   * `ordemEquipes`: nomes das equipes do escopo (todas aparecem, mesmo sem resultado).
+   */
+  function resultadoPorEquipe(visitas, ordemEquipes) {
+    const chave = (r) => N().chave(r).replace(/ /g, '');
+    const porEquipe = new Map();
+    for (const nome of ordemEquipes) porEquipe.set(chave(nome), { recurso: nome, exec: 0, resultado: 0, tipos: new Map() });
     for (const v of visitas) {
       if (v.grupoStatus !== 'exec') continue;
-      const k = v.recurso + '\u0001' + v.projeto;
-      let c = cel.get(k);
-      if (!c) { c = { exec: 0, resultado: 0 }; cel.set(k, c); }
-      c.exec++;
-      if (v.grupoRetorno === 'resultado') c.resultado++;
+      const e = porEquipe.get(chave(v.recurso));
+      if (!e) continue;
+      e.exec++;
+      if (v.grupoRetorno !== 'resultado') continue;
+      e.resultado++;
+      for (const id of tiposDoResultado(v)) e.tipos.set(id, (e.tipos.get(id) || 0) + 1);
     }
-    return recursosOrdem.map((rec) => ({
-      recurso: rec,
-      celulas: projetosOrdem.map((p) => {
-        const c = cel.get(rec + '\u0001' + p) || { exec: 0, resultado: 0 };
-        return { projeto: p, exec: c.exec, resultado: c.resultado, taxa: div(c.resultado, c.exec) };
-      }),
+    const rotulo = new Map(TIPOS_RESULTADO.map((t) => [t.id, t.rotulo]));
+    const linhas = Array.from(porEquipe.values()).map((e) => ({
+      recurso: e.recurso,
+      exec: e.exec,
+      resultado: e.resultado,
+      taxa: div(e.resultado, e.exec),
+      tipos: Array.from(e.tipos.entries()).map(([id, n]) => ({ id, rotulo: rotulo.get(id), n })).sort((a, b) => b.n - a.n || a.rotulo.localeCompare(b.rotulo, 'pt-BR')),
     }));
+    linhas.sort((a, b) => b.resultado - a.resultado || b.exec - a.exec || a.recurso.localeCompare(b.recurso, 'pt-BR'));
+    return linhas;
   }
 
   // ---------- novos alvos ----------
@@ -245,17 +269,20 @@
    * Matrículas cuja ÚLTIMA visita terminou em ocorrência recuperável.
    * `acao`: 'revisitar' | 'corrigir_endereco'. Ordena pela chance estimada.
    */
-  function alvosOcorrencia(visitas, modelo, acao) {
+  function alvosOcorrencia(visitas, modelo, acao, historico) {
     const limite = CV.regras.limiteTentativas;
+    const base = historico || visitas; // o histórico pode ter visitas de fora do filtro/escopo
+    const candidatas = new Set(visitas.map((v) => v.id));
     const porMat = new Map();
-    for (const v of visitas) {
+    for (const v of base) {
       if (!v.mat) continue;
       if (!porMat.has(v.mat)) porMat.set(v.mat, []);
       porMat.get(v.mat).push(v);
     }
-    const ultima = ultimaVisitaPorMatricula(visitas);
+    const ultima = ultimaVisitaPorMatricula(base);
     const out = [];
     for (const [mat, v] of ultima) {
+      if (!candidatas.has(v.id)) continue;
       if (v.grupoStatus !== 'oc' || v.acao !== acao) continue;
       const hist = porMat.get(mat);
       const tentativas = hist.filter((x) => x.grupoStatus === 'oc').length;
@@ -327,7 +354,8 @@
   }
 
   CV.metricas = {
-    filtrar, resumo, agruparPor, porPeriodo, matrizPeriodos, textosAvulsas, matriz, criarModeloChance,
+    filtrar, resumo, agruparPor, porPeriodo, textosAvulsas, criarModeloChance,
+    TIPOS_RESULTADO, tiposDoResultado, cartoes, resultadoPorEquipe,
     alvosOcorrencia, alvosSemRetorno, alvosEsgotados, territorios,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = CV.metricas;

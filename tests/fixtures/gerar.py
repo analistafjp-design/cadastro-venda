@@ -179,8 +179,11 @@ if __name__ == "__main__":
     os.makedirs(EXEMPLOS, exist_ok=True)
     planilha(os.path.join(AQUI, "atividades.xlsx"), "Cadastral", CAB_ATIV, linhas_atividades())
     planilha(os.path.join(AQUI, "resultados.xlsx"), "Planilha1", CAB_RES, linhas_resultados())
-    # os mesmos dados sintéticos servem de exemplo para experimentar o painel
-    planilha(os.path.join(EXEMPLOS, "exemplo-atividades.xlsx"), "Cadastral", CAB_ATIV, linhas_atividades())
+    # os mesmos dados sintéticos servem de exemplo para experimentar o painel; as equipes passam a ser
+    # equipes do escopo do painel (js/regras.js), senão a tela não mostraria nada
+    escopo = {"RIORECIN-001": "RIORECIN-004", "RIORECIN-002": "RIORECIN-007"}
+    exemplo = [[escopo.get(l[0], l[0])] + l[1:] for l in linhas_atividades() if not str(l[0]).startswith("RIOCORTE")]
+    planilha(os.path.join(EXEMPLOS, "exemplo-atividades.xlsx"), "Cadastral", CAB_ATIV, exemplo)
     planilha(os.path.join(EXEMPLOS, "exemplo-resultados.xlsx"), "Planilha1", CAB_RES, linhas_resultados())
     planilha(os.path.join(AQUI, "atividades_cabecalho_na_linha_3.xlsx"), "Cadastral", CAB_ATIV, linhas_atividades()[:3], topo=2)
     export_estilo_sistema(os.path.join(AQUI, "atividades_export_sistema.xlsx"))

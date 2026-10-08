@@ -22,6 +22,40 @@
     limiteTentativas: 3,
 
     /**
+     * ESCOPO do painel: só entram equipes e cidades daqui (o arquivo do sistema traz
+     * outras regiões, ex.: Itaboraí, São Gonçalo). Comparação sem acento/caixa e, nas
+     * equipes, sem espaços e hífens. Lista vazia = não filtra.
+     */
+    escopo: {
+      equipes: [
+        'RIORECIN-004', 'RIORECIN-007', 'RIORECIN-013', 'RIORECIN-024', 'RIORECIN-034',
+        'RIOVENIN-001', 'RIOVENIN-002', 'RIOVENIN-003', 'RIOVENIN-004', 'RIOVENIN-005',
+      ],
+      cidades: [
+        'APERIBE', 'CACHOEIRAS DE MACACU', 'CAMBUCI', 'CANTAGALO', 'CASIMIRO DE ABREU', 'CORDEIRO',
+        'DUAS BARRAS', 'ITAOCARA', 'MIRACEMA', 'RIO BONITO',
+        'S.FCO.DO ITABAPOANA', 'SAO FRANCISCO DO ITABAPOANA', // grafias da mesma cidade
+        'S.SEBASTIAO DO ALTO', 'SAO SEBASTIAO DO ALTO',
+      ],
+    },
+
+    /**
+     * Tempos das equipes (página "Tempos das equipes"), por equipe e dia. Dia = do início da
+     * 1ª atividade (menos o deslocamento até ela) ao fim da última.
+     *   deslocamento = soma de "Tempo de Deslocamento"
+     *   serviço      = duração das atividades de serviço (todas que não são de apoio)
+     *   pausas/apoio = duração das atividades de apoio (refeição, DDS, carregamento, clima...)
+     *   ociosidade   = o que sobra do dia (e as durações dos tipos de "tiposOciosos")
+     * Tipos comparados pela chave sem acento.
+     */
+    tempos: {
+      tiposApoio: ['REFEICAO', 'CHECKLIST INICIO', 'DDS', 'CARREGAMENTO DE MATERIAL', 'CONDICAO CLIMATICA', 'ABASTECIMENTO DE VEICULO'],
+      tiposOciosos: [], // ex.: ['CARREGAMENTO DE MATERIAL'] para contar como ociosidade
+      tiposDeslocamento: ['DESLOCAMENTO'],
+      statusSemTempo: ['CANCELADA', 'PENDENTE'],
+    },
+
+    /**
      * Tipos de atividade que contam como "alvo gerado para visita"
      * (comparação por chave sem acento). Lista vazia = aceita todos.
      */

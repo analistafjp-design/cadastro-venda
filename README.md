@@ -9,15 +9,17 @@ Ele cruza, pela **matrícula**, duas planilhas:
 | **Atividades** | Os alvos visitados (uma linha por visita): equipe, matrícula, data, status, projeto/base, cidade, motivo de não execução... | Exportação do sistema de campo (modelo completo, ~300 colunas) ou a versão "leve" (Cadastrais) |
 | **Resultados** | O que o backoffice lançou depois da visita: incremento de economia, alteração de categoria, troca de titularidade, tarifa social, "sem tratativa"... | Planilha do formulário de resultados |
 
-e responde, **separado por data**: *quantas visitas geraram resultado, por equipe e por base, e onde vale a pena agir a seguir*.
+e responde, **separado por data**: *quantas visitas geraram resultado, por equipe e por base, onde vale a pena agir a seguir e como cada equipe usa o dia (deslocamento, serviço, ociosidade)*.
+
+O painel olha só a operação do interior: **10 equipes** (`RIORECIN-004/007/013/024/034` e `RIOVENIN-001 a 005`) e **12 cidades** (Aperibé, Cachoeiras de Macacu, Cambuci, Cantagalo, Casimiro de Abreu, Cordeiro, Duas Barras, Itaocara, Miracema, Rio Bonito, São Francisco de Itabapoana e São Sebastião do Alto). Outras equipes e cidades (ex.: São Gonçalo) ficam de fora dos números.
 
 ## Como usar (3 passos)
 
 1. Abra o painel (`index.html` com duplo clique, ou o link do GitHub Pages).
 2. Clique em **Carregar pasta** e escolha a pasta onde ficam as planilhas — por exemplo **OneDrive › Cadastro e Venda**. O app procura nela (e nas subpastas) as planilhas de **Atividades** e de **Resultados**, reconhece cada uma sozinho, ignora o que não for uma das duas e cruza tudo pela matrícula.
-3. Use o filtro de período e as abas.
+3. Use os filtros (período, cidade, equipe, base) e as abas.
 
-**Rotina diária:** o navegador (Chrome/Edge) *lembra a pasta*. No dia seguinte basta abrir o painel: ele já traz o que for novo; se pedir permissão, clique em **Atualizar pasta**. Só são lidas as planilhas **novas ou alteradas** (o app compara nome, tamanho e data de modificação), então a atualização é rápida. Atividades e retornos já carregados são reconhecidos pelo ID e atualizados; nada duplica.
+**Rotina diária:** o navegador (Chrome/Edge) *lembra a pasta*. No dia seguinte basta abrir o painel: ele já traz o que for novo; se pedir permissão, clique em **Atualizar**. Só são lidas as planilhas **novas ou alteradas** (o app compara nome, tamanho e data de modificação), então a atualização é rápida. Atividades e retornos já carregados são reconhecidos pelo ID e atualizados; nada duplica.
 
 **Outras formas de carregar:** arrastar a pasta (ou as planilhas) para a tela; **Adicionar arquivos** para escolher planilhas soltas; **Trocar pasta** para apontar outra.
 
@@ -29,31 +31,40 @@ e responde, **separado por data**: *quantas visitas geraram resultado, por equip
 
 ## O que o painel mostra
 
-Cada número aparece em um só lugar: o topo traz a taxa de resultado e o que não está em nenhuma tabela; os totais ficam na linha *Total* das tabelas.
+Quatro abas, no estilo do painel de Pós-Corte (cards, tabelas limpas, claro/escuro). Os filtros do topo (data inicial/final, cidade, equipe, base) e os atalhos *Último dia · 7 dias · 30 dias · Mês · Tudo* valem para a aba aberta.
 
-- **Diário** — por dia, semana ou mês: atividades, executadas, ocorrências, com retorno, **resultado** e **% de resultado**, aberto por tipo de desfecho (incremento, categoria, titularidade, venda...). Logo abaixo, o **resultado por equipe em cada data** (cada célula: % de resultado da equipe naquele dia; com poucas visitas, "resultado/executadas"). Datas recentes aparecem como *em maturação* (o backoffice ainda está lançando).
-- **Bases e equipes** — a mesma medida por projeto e por equipe (recurso), com *índice* contra a média, e a matriz **equipe × base** (para separar o efeito da equipe do efeito da base que ela recebeu). A linha **SEM PROJETO (avulsas)** reúne as demandas que não são uma base (pedidos do atendimento, solicitações das próprias equipes); o painel mostra os textos mais comuns e o filtro **Ocultar avulsas** as tira da análise.
+- **Visão geral** — o que importa para decidir, sem um monte de números:
+  - **Resultado**: *Percorrido* (= Exec + Exoc), *Exec*, *Exoc*, *Com resultados* e a *taxa de resultado*;
+  - **Tipo de resultado**: *Incremento de economia*, *Incremento de economia e alteração de categoria*, *Total de incremento*, *Total alteração de categoria*, *Troca de titularidade* (e *Outros resultados*, se houver: tarifa social, fatura digital, venda, negociação de débitos);
+  - **Bases**: percorrido, com resultados e % de resultado de cada base (projeto);
+  - **Resultado por equipe**: só o que trouxe resultado, para as 10 equipes. O **+** sob o nome abre os serviços que trouxeram resultado e a quantidade;
+  - **Por data**: dia, semana ou mês. Datas recentes aparecem como *em maturação* (o backoffice ainda está lançando).
+- **Tempos das equipes** — por equipe: **deslocamento**, **serviço**, **pausas e apoio** (refeição, DDS, checklist...) e **ociosidade**, em horas:minutos, com a média por dia trabalhado (ou o total do período) e uma barra de como o dia foi usado.
 - **Novos alvos** — listas de ação exportáveis em CSV:
   - *Revisitar*: última visita parou em cliente ausente / retornar depois / imóvel fechado, ordenadas pela **chance estimada** (taxa histórica do projeto × nº de economias);
   - *Corrigir endereço*: "endereço não localizado" (ação do backoffice);
   - *Cobrar retorno*: visitas executadas sem nenhum lançamento do backoffice;
   - *Parar de insistir*: matrículas visitadas 2+ vezes sempre "sem tratativa";
   - *Onde atuar*: taxa de resultado por cidade, bairro, setor, nº de economias, categoria... com a leitura "priorizar" / "rever".
-- **Auditoria** — de onde vem cada número: retornos atribuídos × não atribuídos (e por quê), projetos reconhecidos, arquivos carregados, ajuste da janela de cruzamento e das frentes de serviço, e o **CSV do cruzamento completo** (visita por visita) para conferir no Excel.
+- **Auditoria** — de onde vem cada número: o que ficou de fora do escopo, retornos atribuídos × não atribuídos (e por quê), projetos reconhecidos e o que são as demandas avulsas, tipos de atividade usados nos tempos, arquivos carregados, ajuste da janela de cruzamento e das frentes de serviço, e o **CSV do cruzamento completo** (visita por visita) para conferir no Excel.
+
+Os botões do topo exportam o cruzamento em **CSV** e a tela em **PDF** (impressão do navegador).
+
+> **Tempos: use a exportação completa.** Refeição, DDS, carregamento de material e as demais atividades de apoio só vêm na exportação completa do sistema (não na planilha "Cadastrais"). Num dia só com visitas o almoço viraria ociosidade; por isso a aba mostra por padrão só os **dias completos** (os que têm essas atividades) e deixa a opção *Todos os dias*.
 
 ## Como a efetividade é medida (resumo)
 
 - **Executada** = status *Finalizada*. **Ocorrência** = *Encerrada com Ocorrência* (a equipe foi, mas não executou).
 - Um retorno do backoffice pertence à **visita mais recente da mesma matrícula até 30 dias antes** dele.
 - **Resultado** = visita executada cujo retorno trouxe mudança de valor (incremento/alteração de economia, categoria, titularidade, venda/ligação nova, tarifa social, fatura digital, negociação de débitos). **Atualização cadastral** (telefone, endereço, classificação...) conta como tratativa, mas não como resultado.
-- **% de resultado = resultado ÷ executadas.**
+- **Percorrido** = Exec + Exoc (a equipe foi ao local). **% de resultado = resultado ÷ executadas.**
 - O nome da **base/projeto** vem do início do texto de abertura (`PROJETO INCREMENTO: ...` na coluna *Observação*); grafias diferentes do mesmo projeto são unificadas.
 
 Detalhes, colunas usadas e todas as regras: [`docs/REGRAS.md`](docs/REGRAS.md). Análise e decisões de projeto: [`docs/PLANO.md`](docs/PLANO.md).
 
 ## Ajustando as regras
 
-Tudo o que é critério de negócio está em **`js/regras.js`**: janela de cruzamento, nomes/sinônimos de projeto, motivos de não execução recuperáveis, o que conta como resultado. Apareceu um projeto novo? A aba *Auditoria* mostra os textos que não foram reconhecidos; basta acrescentar uma linha em `projetos`.
+Tudo o que é critério de negócio está em **`js/regras.js`**: equipes e cidades do escopo, janela de cruzamento, nomes/sinônimos de projeto, motivos de não execução recuperáveis, o que conta como resultado e o que é pausa/apoio nos tempos. Apareceu um projeto novo? A aba *Auditoria* mostra os textos que não foram reconhecidos; basta acrescentar uma linha em `projetos`.
 
 ## Publicar para a equipe (opcional)
 
@@ -62,7 +73,7 @@ O app é um site estático, sem build. No GitHub: *Settings → Pages → Deploy
 ## Desenvolvimento
 
 ```bash
-npm test                         # 69 testes (Node 18+; sem dependências)
+npm test                         # 83 testes (Node 18+; sem dependências)
 python3 tests/fixtures/gerar.py  # regenera as planilhas sintéticas (requer openpyxl)
 ```
 
@@ -72,17 +83,19 @@ Estrutura:
 index.html            tela (abre direto do disco)
 css/app.css           estilos (claro/escuro automático)
 js/
-  normalize.js        texto, matrícula, datas
-  regras.js           ← regras de negócio editáveis
+  normalize.js        texto, matrícula, datas, horários
+  regras.js           ← regras de negócio editáveis (escopo, tempos, projetos...)
   zip.js xlsx.js      leitor de .xlsx próprio, sem bibliotecas, em fluxo
   projetos.js         nome do projeto + unificação de variações
   resultados.js       classificação do desfecho de cada retorno
+  escopo.js           equipes e cidades da operação
+  tempos.js           deslocamento, serviço, apoio e ociosidade por equipe/dia
   dados.js            colunas, limpeza e derivação
   cruzamento.js       atribuição retorno → visita (matrícula + janela)
   metricas.js         agregações e listas de novos alvos
   pasta.js            varredura de pasta (handle, arrastar, input) e o que já foi lido
   store.js csv.js     armazenamento local (dados e pasta lembrada) e exportação CSV
-  ui-util.js ui-tabela.js app.js   interface
+  ui-util.js ui-tabela.js ui-visao.js app.js   interface (ui-visao: cards, equipes, tempos)
 tests/                testes automatizados + planilhas sintéticas
 exemplos/             planilhas sintéticas para experimentar
 ```

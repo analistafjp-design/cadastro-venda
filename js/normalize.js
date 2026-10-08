@@ -115,6 +115,28 @@
     return null;
   }
 
+  /**
+   * Horário/duração -> minutos (número). Aceita 'HH:MM', 'HH:MM:SS' (inclusive 'T11:13:27'),
+   * fração do dia do Excel (0..1) e números já em minutos não são adivinhados: devolve null.
+   * Ex.: '00:14' -> 14 ; '08:01' -> 481 ; '' -> null.
+   */
+  function minutos(v) {
+    if (v === null || v === undefined || v === '') return null;
+    if (typeof v === 'number') return v >= 0 && v < 1 ? Math.round(v * 1440) : null;
+    const m = /^(?:\d{4}-\d{2}-\d{2})?T?\s*(\d{1,3}):(\d{2})(?::(\d{2}))?$/.exec(String(v).trim());
+    if (!m) return null;
+    const min = Number(m[2]);
+    if (min > 59) return null;
+    return Number(m[1]) * 60 + min + (m[3] && Number(m[3]) >= 30 ? 1 : 0);
+  }
+
+  /** minutos -> 'H:MM' (ex.: 481 -> '8:01'); null -> '–'. */
+  function hhmm(min) {
+    if (min === null || min === undefined || !Number.isFinite(min)) return '–';
+    const t = Math.round(min);
+    return Math.floor(t / 60) + ':' + p2(t % 60);
+  }
+
   /** Diferença em dias entre duas datas ISO (b - a). */
   function diasEntre(a, b) {
     const [ya, ma, da] = a.split('-').map(Number);
@@ -169,7 +191,7 @@
 
   CV.normalize = {
     semAcento, chave, chaveCabecalho, texto, matricula, protocolo, data, serialParaIso,
-    diasEntre, somaDias, dataBR, inicioSemana, diaDaSemana, similaridade, p2,
+    diasEntre, somaDias, dataBR, inicioSemana, diaDaSemana, similaridade, p2, minutos, hhmm,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = CV.normalize;
 })(typeof window !== 'undefined' ? window : globalThis);

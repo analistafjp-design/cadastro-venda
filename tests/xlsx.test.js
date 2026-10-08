@@ -7,7 +7,7 @@ test('lê planilha do Excel/openpyxl: valores, tipos e datas ISO', async () => {
   const r = await CV.xlsx.lerPlanilha(ler('atividades.xlsx'), { colunas: CV.dados.CAMPOS_ATIVIDADES });
   assert.equal(r.aba, 'Cadastral');
   assert.equal(r.linhas.length, 17);
-  assert.deepEqual(r.faltando, ['parecer', 'situacao']); // colunas ausentes são informadas, não quebram
+  assert.deepEqual(r.faltando, ['parecer', 'situacao', 'inicio', 'fim', 'duracao', 'desloc']); // colunas ausentes são informadas, não quebram
   const p = r.linhas[0];
   assert.equal(p.id, 1);
   assert.equal(p.mat, 100000001);

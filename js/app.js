@@ -1,6 +1,6 @@
 /*
- * app.js — controlador da interface: carga de arquivos, estado, filtros,
- * abas (Diário · Bases e equipes · Novos alvos · Auditoria).
+ * app.js — controlador da interface: carga de arquivos, estado, filtros e abas
+ * (Visão geral · Tempos das equipes · Novos alvos · Auditoria).
  */
 (function () {
   'use strict';
@@ -11,6 +11,12 @@
   const { h, fmt } = CV.ui;
   const $ = (id) => document.getElementById(id);
 
+  // Muda quando a leitura das planilhas passa a guardar mais coisas (ex.: horários): os dados
+  // antigos do navegador são descartados e relidos da pasta.
+  const VERSAO_DADOS = 2;
+
+  const chaveEquipe = (r) => N.chave(r).replace(/ /g, '');
+
   const estado = {
     atividades: new Map(),
     resultados: new Map(),
@@ -18,19 +24,26 @@
     frentes: [],
     frentesAtivas: null, // null = todas
     janela: R.janelaDias,
-    cruzado: null,
+    cruzado: null, // cruzamento de TODAS as visitas (serve para ligar os retornos)
+    visitas: [], // só as do escopo (equipes e cidades da operação)
+    descartadas: [], // visitas de fora do escopo (para a auditoria)
+    agenda: [], // atividades com horário das equipes do escopo (tempos)
     modelo: null,
+    totalPercorrido: 0,
     datas: { min: null, max: null },
-    opcoes: { projetos: [], recursos: [], cidades: [] },
-    tipoRecurso: new Map(),
-    filtros: { preset: '30', de: null, ate: null, projetos: new Set(), recursos: new Set(), cidades: new Set(), semAvulsas: false },
+    opcoes: { cidades: [], equipes: [], bases: [] },
+    filtros: { preset: '30', de: null, ate: null, cidade: null, equipe: null, base: null, semAvulsas: false },
+    refs: {},
     gran: 'dia',
     granManual: false,
-    aba: 'diario',
-    subBases: 'projetos',
+    modoTempos: 'media',
+    soCompletos: true, // tempos: só dias com refeição/apoio registrados
+    aba: 'visao',
     subAlvos: 'revisitar',
     dimTerr: 'cidade',
     ordem: {},
+    abertas: new Set(), // equipes com o "+" aberto
+    atualizadoEm: null,
     persistente: true,
     pasta: null, // { handle, nome, ultima } — pasta lembrada (só Chrome/Edge)
   };
@@ -121,9 +134,6 @@
         ov.texto('Cruzando matrículas…');
         await pausa();
         recalcular();
-        if (!estado.jaTinhaDados) aplicarPreset(estado.filtros.preset);
-        estado.jaTinhaDados = true;
-        montarFiltros();
         renderTudo();
       }
     } finally {
@@ -201,8 +211,7 @@
       const partes = [fmt.int(limp.limpas.length) + ' ' + (tipo === 'atividades' ? 'atividades' : 'retornos') + ' (' + fmt.int(novos) + ' novos, ' + fmt.int(atualizados) + ' já carregados antes e atualizados)'];
       if (repetidas) partes.push(fmt.int(repetidas) + ' linha(s) repetida(s) no arquivo (mesmo ID) contadas uma vez só');
       if (tipo === 'atividades') {
-        const ign = Object.values(limp.descartes.tipoIgnorado).reduce((a, b) => a + b, 0);
-        if (ign) partes.push(fmt.int(ign) + ' de outros tipos de serviço ignoradas');
+        if (limp.descartes.outrosServicos) partes.push(fmt.int(limp.descartes.outrosServicos) + ' de outras equipes e de outros serviços ignoradas');
         if (limp.descartes.semData) partes.push(fmt.int(limp.descartes.semData) + ' sem data válida descartadas');
       }
       mensagem('ok', f.name + ': ' + partes.join(' · ') + '.');
@@ -230,9 +239,18 @@
   async function restaurar() {
     try {
       const salvo = await CV.store.carregar();
-      for (const a of salvo.atividades) estado.atividades.set(a.id, a);
-      for (const r of salvo.resultados) estado.resultados.set(r.id, r);
-      estado.arquivos = (salvo.arquivos || []).sort((a, b) => (a.quando < b.quando ? -1 : 1));
+      const versao = await CV.store.lerConfig('versaoDados');
+      const tinha = salvo.atividades.length || salvo.resultados.length;
+      if (tinha && !(versao && versao.v >= VERSAO_DADOS)) {
+        // dados guardados por uma versão antiga: sem horários e sem as atividades de apoio
+        await CV.store.limpar();
+        estado.precisaRelerPasta = true;
+      } else {
+        for (const a of salvo.atividades) estado.atividades.set(a.id, a);
+        for (const r of salvo.resultados) estado.resultados.set(r.id, r);
+        estado.arquivos = (salvo.arquivos || []).sort((a, b) => (a.quando < b.quando ? -1 : 1));
+      }
+      if (!versao || versao.v !== VERSAO_DADOS) await CV.store.salvarConfig('versaoDados', { v: VERSAO_DADOS });
       const cfg = await CV.store.lerConfig('pasta');
       if (cfg && cfg.handle) estado.pasta = { handle: cfg.handle, nome: cfg.nome || cfg.handle.name, ultima: cfg.ultima || null };
     } catch (e) {
@@ -307,7 +325,7 @@
     const p = estado.pasta;
     const quando = p && p.ultima ? ' · lida em ' + new Date(p.ultima).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '';
     const btn = $('btn-pasta');
-    btn.textContent = p && temSeletorDePasta() ? 'Atualizar pasta' : 'Carregar pasta';
+    $('rot-pasta').textContent = p && temSeletorDePasta() ? 'Atualizar' : 'Carregar pasta';
     btn.title = p ? 'Lê só as planilhas novas ou alteradas da pasta “' + p.nome + '”' + quando : 'Escolha a pasta (ex.: OneDrive › Cadastro e Venda) com as planilhas de Atividades e Resultados';
     $('btn-trocar-pasta').hidden = !(p && temSeletorDePasta());
     const grande = $('btn-escolher-pasta');
@@ -321,7 +339,9 @@
     estado.resultados.clear();
     estado.arquivos = [];
     estado.cruzado = null;
-    estado.jaTinhaDados = false;
+    estado.visitas = [];
+    estado.descartadas = [];
+    estado.agenda = [];
     if (estado.pasta) estado.pasta.ultima = null;
     $('mensagens').textContent = '';
     renderTudo();
@@ -337,46 +357,55 @@
       estado.frentesAtivas = new Set(Array.from(estado.frentesAtivas).filter((f) => estado.frentes.includes(f)));
       if (!estado.frentesAtivas.size) estado.frentesAtivas = null;
     }
+    // o cruzamento usa todas as visitas (um retorno pode ter nascido numa visita de outra equipe);
+    // depois, o painel mostra só as equipes e cidades do escopo
     estado.cruzado = CV.cruzamento.montar(at, rs, { janelaDias: estado.janela, frentes: estado.frentesAtivas });
-    const vs = estado.cruzado.visitas;
-    estado.modelo = M.criarModeloChance(vs);
+    const esc = CV.escopo.aplicar(estado.cruzado.visitas);
+    estado.visitas = esc.dentro;
+    estado.descartadas = esc.descartadas;
+    estado.agenda = CV.tempos.agendaDe(at);
+    estado.modelo = M.criarModeloChance(estado.visitas);
+    estado.totalPercorrido = M.resumo(estado.visitas).percorrido;
 
     let min = null;
     let max = null;
-    const proj = new Map();
-    const rec = new Map();
+    const dia = (d) => {
+      if (!min || d < min) min = d;
+      if (!max || d > max) max = d;
+    };
     const cid = new Map();
-    estado.tipoRecurso = new Map();
-    for (const v of vs) {
-      if (!min || v.data < min) min = v.data;
-      if (!max || v.data > max) max = v.data;
-      proj.set(v.projeto, (proj.get(v.projeto) || 0) + 1);
-      rec.set(v.recurso, (rec.get(v.recurso) || 0) + 1);
+    const bas = new Map();
+    for (const v of estado.visitas) {
+      dia(v.data);
       const c = v.cidade || '(sem cidade)';
       cid.set(c, (cid.get(c) || 0) + 1);
-      if (!estado.tipoRecurso.has(v.recurso)) estado.tipoRecurso.set(v.recurso, v.equipe);
+      bas.set(v.projeto, (bas.get(v.projeto) || 0) + 1);
     }
+    for (const a of estado.agenda) dia(a.data);
     estado.datas = { min, max };
-    const ord = (mapa) => Array.from(mapa.entries()).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'pt-BR')).map(([valor, n]) => ({ valor, n }));
-    estado.opcoes = { projetos: ord(proj), recursos: ord(rec), cidades: ord(cid) };
-    for (const [chave, lista] of [['projetos', estado.opcoes.projetos], ['recursos', estado.opcoes.recursos], ['cidades', estado.opcoes.cidades]]) {
-      const validos = new Set(lista.map((o) => o.valor));
-      for (const v of Array.from(estado.filtros[chave])) if (!validos.has(v)) estado.filtros[chave].delete(v);
-    }
-    delete estado._vs;
+    const alfa = (a, b) => a.localeCompare(b, 'pt-BR');
+    estado.opcoes = {
+      cidades: Array.from(cid.keys()).sort(alfa),
+      equipes: R.escopo.equipes.slice(),
+      bases: Array.from(bas.entries()).sort((a, b) => b[1] - a[1] || alfa(a[0], b[0])).map((x) => x[0]),
+    };
+    const f = estado.filtros;
+    if (f.cidade && !estado.opcoes.cidades.includes(f.cidade)) f.cidade = null;
+    if (f.base && !estado.opcoes.bases.includes(f.base)) f.base = null;
+    estado.atualizadoEm = new Date();
+    if (f.preset !== 'custom') aplicarPreset(f.preset); // "último dia", "7 dias"... acompanham o dado mais novo
+    cacheVs = null;
   }
 
   function aplicarPreset(p) {
     const f = estado.filtros;
     f.preset = p;
-    const fim = estado.datas.max;
-    if (!fim) { f.de = null; f.ate = null; return; }
-    if (p === 'tudo') { f.de = null; f.ate = null; }
-    else if (p === 'mes') { f.de = fim.slice(0, 8) + '01'; f.ate = null; }
-    else if (p === 'custom') { /* mantém as datas digitadas */ }
-    else { f.de = N.somaDias(fim, -(Number(p) - 1)); f.ate = null; }
+    const { min, max } = estado.datas;
+    if (!max) { f.de = null; f.ate = null; return; }
+    if (p === 'tudo') { f.de = min; f.ate = max; }
+    else if (p === 'mes') { f.de = max.slice(0, 8) + '01'; f.ate = max; }
+    else if (p !== 'custom') { f.de = N.somaDias(max, -(Number(p) - 1)); f.ate = max; }
     if (p !== 'custom') estado.granManual = false;
-    delete estado._vs;
   }
 
   function granularidadeAtual() {
@@ -388,128 +417,156 @@
     return dias <= 62 ? 'dia' : dias <= 200 ? 'semana' : 'mes';
   }
 
-  function visitasFiltradas() {
-    if (!estado._vs) estado._vs = M.filtrar(estado.cruzado.visitas, estado.filtros);
-    return estado._vs;
+  /** Visitas do escopo com os filtros da tela. `comPeriodo: false` ignora as datas (listas de novos alvos). */
+  function filtrarVisitas(lista, comPeriodo) {
+    const f = estado.filtros;
+    const base = M.filtrar(lista, {
+      de: comPeriodo ? f.de : null,
+      ate: comPeriodo ? f.ate : null,
+      semAvulsas: f.semAvulsas,
+      projetos: f.base ? new Set([f.base]) : null,
+      cidades: f.cidade ? new Set([f.cidade]) : null,
+    });
+    return f.equipe ? base.filter((v) => chaveEquipe(v.recurso) === chaveEquipe(f.equipe)) : base;
   }
 
-  const visitasSemPeriodo = () => M.filtrar(estado.cruzado.visitas, Object.assign({}, estado.filtros, { de: null, ate: null }));
+  let cacheVs = null;
+  const visitasFiltradas = () => cacheVs || (cacheVs = filtrarVisitas(estado.visitas, true));
+
+  /** Tempos: só período e equipe (cidade e base não se aplicam a refeição, deslocamento etc.). */
+  function agendaFiltrada() {
+    const f = estado.filtros;
+    return estado.agenda.filter((a) => (!f.de || a.data >= f.de) && (!f.ate || a.data <= f.ate) &&
+      (!f.equipe || chaveEquipe(a.recurso) === chaveEquipe(f.equipe)));
+  }
+
+  const equipesVisiveis = () => (estado.filtros.equipe ? [estado.filtros.equipe] : estado.opcoes.equipes);
 
   // ---------------------------------------------------------------- filtros
 
-  function criarMulti(rotulo, chave) {
-    const det = h('details', { class: 'multi' });
-    const sum = h('summary');
-    const painel = h('div', { class: 'painel-multi' });
-    det.appendChild(sum);
-    det.appendChild(painel);
-
-    function atualizar() {
-      const sel = estado.filtros[chave];
-      const opcoes = estado.opcoes[chave];
-      sum.textContent = rotulo + ': ' + (sel.size === 0 ? 'todos' : sel.size === 1 ? Array.from(sel)[0] : sel.size + ' selecionados');
-      det.classList.toggle('ativo', sel.size > 0);
-      painel.textContent = '';
-      for (const o of opcoes) {
-        const cb = h('input', { type: 'checkbox', checked: sel.has(o.valor) });
-        cb.addEventListener('change', () => {
-          if (cb.checked) sel.add(o.valor); else sel.delete(o.valor);
-          delete estado._vs;
-          atualizar();
-          renderConteudo();
-        });
-        painel.appendChild(h('label', null, cb, h('span', { text: o.valor }), h('span', { class: 'n', text: fmt.int(o.n) })));
-      }
-      painel.appendChild(h('div', { class: 'rodape' },
-        h('button', { class: 'btn mini fantasma', text: 'Limpar seleção', on: { click: () => { sel.clear(); delete estado._vs; atualizar(); renderConteudo(); } } })
-      ));
-    }
-    atualizar();
-    return { el: det, atualizar };
-  }
-
-  let multis = [];
+  const PRESETS = [['1', 'Último dia'], ['7', '7 dias'], ['30', '30 dias'], ['mes', 'Mês'], ['tudo', 'Tudo']];
 
   function montarFiltros() {
-    const alvo = $('filtros-conteudo');
+    const alvo = $('filtros');
     alvo.textContent = '';
     const f = estado.filtros;
-    const presets = [['1', 'Último dia'], ['7', '7 dias'], ['30', '30 dias'], ['mes', 'Mês'], ['tudo', 'Tudo']];
-    const seg = h('div', { class: 'segmentado', role: 'group', 'aria-label': 'Período' });
-    const botoes = presets.map(([id, nome]) => h('button', { type: 'button', text: nome, attrs: { 'aria-pressed': String(f.preset === id) }, on: { click: () => { aplicarPreset(id); montarFiltros(); renderConteudo(); } } }));
-    botoes.forEach((b) => seg.appendChild(b));
+    const refs = (estado.refs = {});
+    const semTerritorio = estado.aba === 'tempos';
 
-    const inDe = h('input', { type: 'date', value: f.de || '', min: estado.datas.min || '', max: estado.datas.max || '', attrs: { 'aria-label': 'Data inicial' } });
-    const inAte = h('input', { type: 'date', value: f.ate || '', min: estado.datas.min || '', max: estado.datas.max || '', attrs: { 'aria-label': 'Data final' } });
+    const inData = (valor, rotulo) => h('input', { type: 'date', value: valor || '', min: estado.datas.min || '', max: estado.datas.max || '', attrs: { 'aria-label': rotulo } });
+    refs.de = inData(f.de, 'Data inicial');
+    refs.ate = inData(f.ate, 'Data final');
     const mudouData = () => {
-      f.de = inDe.value || null;
-      f.ate = inAte.value || null;
+      f.de = refs.de.value || null;
+      f.ate = refs.ate.value || null;
       f.preset = 'custom';
       estado.granManual = false;
-      delete estado._vs;
-      botoes.forEach((b) => b.setAttribute('aria-pressed', 'false'));
-      renderConteudo();
+      mudouFiltro();
     };
-    inDe.addEventListener('change', mudouData);
-    inAte.addEventListener('change', mudouData);
+    refs.de.addEventListener('change', mudouData);
+    refs.ate.addEventListener('change', mudouData);
 
-    multis = [criarMulti('Projeto', 'projetos'), criarMulti('Equipe', 'recursos'), criarMulti('Cidade', 'cidades')];
-    alvo.appendChild(h('div', { class: 'grupo-filtro' }, h('span', { class: 'rotulo-filtro', text: 'Visitas em' }), seg, inDe, h('span', { text: 'a' }), inAte));
-    const cbAvulsas = h('input', { type: 'checkbox', checked: f.semAvulsas });
-    cbAvulsas.addEventListener('change', () => { f.semAvulsas = cbAvulsas.checked; delete estado._vs; renderConteudo(); });
-    alvo.appendChild(h('div', { class: 'grupo-filtro' }, multis.map((m) => m.el),
-      h('label', { class: 'check', title: 'Esconde as atividades que não pertencem a nenhum projeto (pedidos do atendimento, solicitações das próprias equipes...)' }, cbAvulsas, 'Ocultar avulsas')));
+    const seletor = (chave, rotulo, todos, valores, desabilitado) => {
+      const sel = h('select', { disabled: desabilitado, attrs: { 'aria-label': rotulo }, title: desabilitado ? 'Não se aplica aos tempos das equipes' : null },
+        h('option', { value: '', text: todos }),
+        valores.map((v) => h('option', { value: v, text: v })));
+      sel.value = f[chave] || '';
+      sel.addEventListener('change', () => { f[chave] = sel.value || null; mudouFiltro(); });
+      refs[chave] = sel;
+      return sel;
+    };
+
+    const campo = (rotulo, el) => h('label', { class: 'campo' }, h('span', { text: rotulo }), el);
+    alvo.appendChild(campo('Data inicial', refs.de));
+    alvo.appendChild(campo('Data final', refs.ate));
+    alvo.appendChild(campo('Cidade', seletor('cidade', 'Cidade', 'Todas as cidades', estado.opcoes.cidades, semTerritorio)));
+    alvo.appendChild(campo('Equipe', seletor('equipe', 'Equipe', 'Todas as equipes', estado.opcoes.equipes, false)));
+    alvo.appendChild(campo('Base', seletor('base', 'Base', 'Todas as bases', estado.opcoes.bases, semTerritorio)));
   }
 
-  document.addEventListener('click', (e) => {
-    document.querySelectorAll('details.multi[open]').forEach((d) => { if (!d.contains(e.target)) d.removeAttribute('open'); });
-  });
+  /** Reflete nos campos o que mudou por fora deles (atalhos de período, "Limpar filtros"). */
+  function sincronizarFiltros() {
+    const f = estado.filtros;
+    const r = estado.refs;
+    if (r.de) r.de.value = f.de || '';
+    if (r.ate) r.ate.value = f.ate || '';
+    for (const k of ['cidade', 'equipe', 'base']) if (r[k]) r[k].value = f[k] || '';
+  }
+
+  function mudouFiltro() {
+    cacheVs = null;
+    sincronizarFiltros();
+    renderChips();
+    renderPainel();
+  }
+
+  function renderChips() {
+    const alvo = $('chips');
+    alvo.textContent = '';
+    const f = estado.filtros;
+    for (const [id, nome] of PRESETS) {
+      alvo.appendChild(h('button', {
+        type: 'button', class: 'chip preset', text: nome, attrs: { 'aria-pressed': String(f.preset === id) },
+        on: { click: () => { aplicarPreset(id); mudouFiltro(); } },
+      }));
+    }
+    alvo.appendChild(h('span', { class: 'sep' }));
+    const semTerritorio = estado.aba === 'tempos';
+    const ativos = [['equipe', 'Equipe'], ['cidade', 'Cidade'], ['base', 'Base']].filter(([k]) => f[k] && !(semTerritorio && k !== 'equipe'));
+    for (const [k, rotulo] of ativos) {
+      alvo.appendChild(h('span', { class: 'chip' }, rotulo + ': ' + f[k],
+        h('button', { type: 'button', text: '×', title: 'Remover o filtro', attrs: { 'aria-label': 'Remover o filtro de ' + rotulo.toLowerCase() }, on: { click: () => { f[k] = null; mudouFiltro(); } } })));
+    }
+    if (ativos.length) {
+      alvo.appendChild(h('button', { type: 'button', class: 'chip acao', text: 'Limpar filtros', on: { click: () => { f.cidade = null; f.equipe = null; f.base = null; mudouFiltro(); } } }));
+    }
+    alvo.appendChild(h('span', { class: 'espaco' }));
+    if (estado.aba === 'visao' || estado.aba === 'alvos') {
+      const cb = h('input', { type: 'checkbox', checked: f.semAvulsas });
+      cb.addEventListener('change', () => { f.semAvulsas = cb.checked; mudouFiltro(); });
+      alvo.appendChild(h('label', { class: 'check', title: 'Esconde as atividades que não pertencem a nenhuma base de alvos (pedidos do atendimento, solicitações das próprias equipes...)' }, cb, 'Ocultar avulsas'));
+    }
+    if (estado.aba === 'visao') {
+      alvo.appendChild(h('span', { class: 'info', text: fmt.int(M.resumo(visitasFiltradas()).percorrido) + ' de ' + fmt.int(estado.totalPercorrido) + ' percorridas' }));
+    }
+  }
 
   // ---------------------------------------------------------------- render
 
   function renderTudo() {
-    const temDados = estado.cruzado && estado.cruzado.visitas.length > 0;
+    const temDados = !!(estado.cruzado && estado.cruzado.visitas.length);
     $('vazio').hidden = temDados;
     $('app').hidden = !temDados;
+    $('abas').hidden = !temDados;
     $('btn-exportar').hidden = !temDados;
-    $('btn-limpar').hidden = !(temDados || estado.resultados.size);
+    $('btn-pdf').hidden = !temDados;
+    $('btn-limpar').hidden = !(temDados || estado.resultados.size || estado.atividades.size);
     atualizarBotoes();
+    const sub = $('sub-topo');
     if (!temDados) {
-      $('sub-topo').textContent = estado.resultados.size ? 'Faltam as atividades (planilha de Atividades/Cadastral) para cruzar.' : 'Nenhum dado carregado';
+      sub.textContent = estado.resultados.size ? 'Faltam as atividades (planilha de Atividades/Cadastral) para cruzar.' : 'Nenhum dado carregado';
+      sub.title = '';
       return;
     }
-    $('sub-topo').textContent = `visitas de ${fmt.longa(estado.datas.min)} a ${fmt.longa(estado.datas.max)}` +
-      (estado.cruzado.dataReferencia ? ` · último retorno do backoffice em ${fmt.longa(estado.cruzado.dataReferencia)}` : '') +
-      (estado.pasta && estado.pasta.ultima ? ` · pasta “${estado.pasta.nome}” lida em ${new Date(estado.pasta.ultima).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}` : '');
-    $('sub-topo').title = $('sub-topo').textContent;
+    const partes = [];
+    partes.push(fmt.int(estado.totalPercorrido) + ' percorridas');
+    if (estado.datas.max) partes.push('visitas até ' + fmt.longa(estado.datas.max));
+    if (estado.cruzado.dataReferencia) partes.push('retornos até ' + fmt.longa(estado.cruzado.dataReferencia));
+    if (estado.atualizadoEm) partes.push('atualizado às ' + estado.atualizadoEm.toLocaleTimeString('pt-BR'));
+    sub.textContent = partes.join(' · ');
+    sub.title = sub.textContent;
     renderConteudo();
   }
 
   function renderConteudo() {
-    if (!estado.cruzado) return;
-    renderResumo();
+    cacheVs = null;
+    montarFiltros();
     renderAbas();
+    renderChips();
     renderPainel();
   }
 
-  function renderResumo() {
-    const r = M.resumo(visitasFiltradas());
-    const alvo = $('resumo');
-    alvo.textContent = '';
-    // Os totais (atividades, executadas, resultado...) ficam só na linha "Total" das tabelas.
-    // Aqui entram a taxa e apenas o que não aparece em nenhuma tabela.
-    alvo.appendChild(h('div', { class: 'heroi' },
-      h('div', { class: 'rotulo', text: 'Taxa de resultado' }),
-      h('div', { class: 'valor', text: fmt.pct(r.taxaResultado) }),
-      h('div', { class: 'sub', text: 'das visitas executadas geraram resultado' })
-    ));
-    const num = (valor, rotulo) => h('div', { class: 'num' }, h('div', { class: 'valor', text: valor }), h('div', { class: 'rotulo', text: rotulo }));
-    const itens = [num(fmt.int(r.matriculas), 'matrículas distintas visitadas')];
-    if (r.maturando) itens.push(num(fmt.int(r.maturando), 'visitas recentes ainda em maturação'));
-    alvo.appendChild(h('div', { class: 'numeros' }, itens));
-  }
-
-  const ABAS = [['diario', 'Diário'], ['bases', 'Bases e equipes'], ['alvos', 'Novos alvos'], ['auditoria', 'Auditoria']];
+  const ABAS = [['visao', 'Visão geral'], ['tempos', 'Tempos das equipes'], ['alvos', 'Novos alvos'], ['auditoria', 'Auditoria']];
 
   function renderAbas() {
     const alvo = $('abas');
@@ -517,7 +574,7 @@
     for (const [id, nome] of ABAS) {
       alvo.appendChild(h('button', {
         type: 'button', role: 'tab', text: nome, attrs: { 'aria-selected': String(estado.aba === id) },
-        on: { click: () => { estado.aba = id; renderAbas(); renderPainel(); } },
+        on: { click: () => { estado.aba = id; montarFiltros(); renderAbas(); renderChips(); renderPainel(); } },
       }));
     }
   }
@@ -525,10 +582,28 @@
   function renderPainel() {
     const alvo = $('painel');
     alvo.textContent = '';
-    if (estado.aba === 'diario') renderDiario(alvo);
-    else if (estado.aba === 'bases') renderBases(alvo);
-    else if (estado.aba === 'alvos') renderAlvos(alvo);
-    else renderAuditoria(alvo);
+    if (!estado.visitas.length && estado.aba !== 'auditoria') {
+      alvo.appendChild(h('p', { class: 'explica' },
+        'Nenhuma visita das equipes e cidades da operação nos arquivos carregados. Veja na aba ', h('b', { text: 'Auditoria' }),
+        ' o que ficou de fora; as equipes e as cidades consideradas ficam em ', h('code', { text: 'escopo' }), ' no arquivo ', h('code', { text: 'js/regras.js' }), '.'));
+      return;
+    }
+    if (estado.aba === 'visao') {
+      CV.ui.renderVisao(alvo, {
+        vs: visitasFiltradas(), equipes: equipesVisiveis(), gran: granularidadeAtual(), ordemDe, abertas: estado.abertas,
+        aoMudarGran: (g) => { estado.gran = g; estado.granManual = true; renderPainel(); },
+      });
+    } else if (estado.aba === 'tempos') {
+      CV.ui.renderTempos(alvo, {
+        agenda: agendaFiltrada(), equipes: equipesVisiveis(), modo: estado.modoTempos, ordemDe, soCompletos: estado.soCompletos,
+        aoMudarModo: (m) => { estado.modoTempos = m; renderPainel(); },
+        aoMudarCompletos: (v) => { estado.soCompletos = v; renderPainel(); },
+      });
+    } else {
+      const bloco = h('section', { class: 'bloco' });
+      alvo.appendChild(bloco);
+      if (estado.aba === 'alvos') renderAlvos(bloco); else renderAuditoria(bloco);
+    }
   }
 
   function segmentado(opcoes, atual, aoMudar, rotulo) {
@@ -550,185 +625,18 @@
     CV.csv.baixar(nome, cols, linhas);
   }
 
-  const etiquetaMat = () => h('span', { class: 'etiqueta mat', text: 'em maturação', title: 'Visitas dos últimos ' + R.diasMaturacao + ' dias: os retornos do backoffice ainda estão chegando.' });
-  const etiquetaPeq = () => h('span', { class: 'etiqueta', text: 'amostra pequena', title: 'Menos de ' + R.minAmostra + ' visitas executadas: a taxa oscila muito.' });
-
-  // ---- Diário
-
-  const MIN_CEL = 5; // células com menos executadas mostram "resultado/executadas" em vez do %
-
-  /**
-   * Célula de matriz sem repetir número: com amostra suficiente mostra só o % (cor = intensidade);
-   * com amostra pequena mostra só "resultado/executadas", sem cor. O detalhe fica no tooltip.
-   */
-  function celulaCalor(c, maxTaxa, titulo) {
-    const suficiente = c.exec >= MIN_CEL;
-    let cls = 'm0';
-    if (suficiente && maxTaxa) {
-      const q = c.taxa / maxTaxa;
-      cls = q > 0.8 ? 'm5' : q > 0.6 ? 'm4' : q > 0.4 ? 'm3' : q > 0.2 ? 'm2' : 'm1';
-    }
-    return h('td', { class: 'cel ' + cls, title: titulo }, !c.exec ? '·' : suficiente ? fmt.pct(c.taxa) : c.resultado + '/' + c.exec);
-  }
-
-  function legendaCalor(texto) {
-    return h('div', { class: 'legenda', style: { marginTop: '10px' } },
-      ['m1', 'm2', 'm3', 'm4', 'm5'].map((c, i) => h('span', null, h('i', { class: c, style: { width: '18px' } }), ['menor', '', '', '', 'maior taxa'][i])),
-      h('span', { text: texto })
-    );
-  }
-
-  function renderDiario(alvo) {
-    const vs = visitasFiltradas();
-    const gran = granularidadeAtual();
-    const linhas = M.porPeriodo(vs, gran);
-    const geral = M.resumo(vs);
-    const nomeGran = gran === 'dia' ? 'dia' : gran === 'semana' ? 'semana' : 'mês';
-
-    alvo.appendChild(h('div', { class: 'cabeca' },
-      h('h2', { text: 'Resultado por ' + nomeGran }),
-      segmentado([['dia', 'Dia'], ['semana', 'Semana'], ['mes', 'Mês']], gran, (g) => { estado.gran = g; estado.granManual = true; renderPainel(); }, 'Agrupar por'),
-      h('span', { class: 'espaco' })
-    ));
-
-    const rotulo = (l) => {
-      if (gran === 'mes') return fmt.mes(l.chave + '-01');
-      if (gran === 'semana') return fmt.curta(l.chave) + ' a ' + fmt.curta(N.somaDias(l.chave, 6));
-      return N.diaDaSemana(l.chave) + ' ' + fmt.longa(l.chave);
-    };
-    const primeira = {
-      id: 'periodo', titulo: gran === 'dia' ? 'Data da visita' : gran === 'semana' ? 'Semana (seg–dom)' : 'Mês', tipo: 'txt',
-      valor: (l) => l.chave, ordena: (l) => l.chave,
-      render: (l) => (l.ehTotal ? 'Total do período' : [rotulo(l), l.maturando > 0 ? etiquetaMat() : null]),
-      csv: (l) => (gran === 'dia' ? fmt.longa(l.chave) : rotulo(l)),
-    };
-    const cols = CV.ui.colunasResumo(primeira, linhas.concat([geral]), geral);
-    alvo.appendChild(CV.ui.criarTabela({
-      colunas: cols, linhas, total: Object.assign({ chave: 'Total do período', ehTotal: true }, geral),
-      ordem: ordemDe('diario-' + gran, { id: 'periodo', dir: 'desc' }),
-    }));
-    alvo.appendChild(h('div', { class: 'cabeca', style: { marginTop: '10px' } },
-      h('p', { class: 'nota', style: { margin: 0, flex: 1 }, text: 'Cada visita é contada na data em que aconteceu, e o resultado volta para a data da visita que o originou (cruzamento pela matrícula). Datas recentes ficam "em maturação": o backoffice leva de 1 a 3 dias para lançar o retorno.' }),
-      h('button', { class: 'btn mini', text: 'Exportar esta tabela (CSV)', on: { click: () => exportarTabela('acompanhamento-' + gran + '.csv', cols, linhas) } })));
-
-    // ---- resultado por equipe, em cada período (colunas: do mais recente ao mais antigo)
-    const mx = M.matrizPeriodos(vs, gran);
-    alvo.appendChild(h('h3', { text: 'Resultado por equipe, em cada ' + nomeGran }));
-    if (!mx.linhas.length) {
-      alvo.appendChild(h('p', { class: 'nota', text: 'Nenhuma visita executada no período selecionado.' }));
-      return;
-    }
-    let maxTaxa = 0;
-    for (const l of mx.linhas) for (const c of l.celulas) if (c.exec >= MIN_CEL && c.taxa > maxTaxa) maxTaxa = c.taxa;
-    const maturando = new Set();
-    for (const l of mx.linhas) for (const c of l.celulas) if (c.maturando > 0) maturando.add(c.chave);
-    const cab = (k) => {
-      const partes = gran === 'mes' ? [fmt.mes(k + '-01')] : [gran === 'dia' ? N.diaDaSemana(k) : 'sem.', fmt.curta(k)];
-      return h('th', { class: 'sem-ordem', title: gran === 'semana' ? 'Semana de ' + fmt.longa(k) : fmt.longa(k) + (maturando.has(k) ? ' — em maturação' : '') },
-        partes.map((t, i) => [i ? h('br') : null, t]), maturando.has(k) ? h('span', { class: 'mat-marca', text: '*' }) : null);
-    };
-    const tabela = h('table', { class: 'tab matriz' },
-      h('thead', null, h('tr', null, h('th', { class: 'txt sem-ordem', text: 'Equipe' }), mx.periodos.map(cab))),
-      h('tbody', null, mx.linhas.map((l) => h('tr', null,
-        h('td', { class: 'txt' }, l.recurso, l.tipo ? h('span', { class: 'etiqueta', text: l.tipo }) : null),
-        l.celulas.map((c) => celulaCalor(c, maxTaxa, c.exec ? l.recurso + ' · ' + (gran === 'mes' ? fmt.mes(c.chave + '-01') : fmt.longa(c.chave)) + ': ' + c.resultado + ' de ' + c.exec + ' executadas (' + fmt.pct(c.taxa) + ')' : 'sem visitas executadas')))))
-    );
-    alvo.appendChild(h('div', { class: 'tabela-wrap' }, tabela));
-    alvo.appendChild(legendaCalor('Cada célula: % de resultado sobre as visitas executadas da equipe naquele ' + nomeGran + '. Com menos de ' + MIN_CEL + ' executadas aparece "resultado/executadas", sem cor.'));
-    alvo.appendChild(h('div', { class: 'cabeca', style: { marginTop: '10px' } }, h('span', { class: 'espaco' }),
-      maturando.size ? h('span', { class: 'nota', style: { margin: 0 }, text: '* em maturação' }) : null,
-      h('button', { class: 'btn mini', text: 'Exportar equipe × ' + nomeGran + ' (CSV)', on: { click: () => exportarEquipePeriodo(mx, gran) } })));
-  }
-
-  function exportarEquipePeriodo(mx, gran) {
-    const linhas = [];
-    for (const l of mx.linhas) for (const c of l.celulas) if (c.exec) linhas.push({ equipe: l.recurso, tipo: l.tipo, chave: c.chave, exec: c.exec, resultado: c.resultado, taxa: c.taxa });
-    CV.csv.baixar('resultado-por-equipe-' + gran + '.csv', [
-      { titulo: 'Equipe', valor: (x) => x.equipe },
-      { titulo: 'Tipo', valor: (x) => x.tipo || '' },
-      { titulo: gran === 'mes' ? 'Mês' : gran === 'semana' ? 'Semana (início)' : 'Data da visita', valor: (x) => (gran === 'mes' ? fmt.mes(x.chave + '-01') : fmt.longa(x.chave)) },
-      { titulo: 'Executadas', valor: (x) => x.exec },
-      { titulo: 'Com resultado', valor: (x) => x.resultado },
-      { titulo: '% Resultado', valor: (x) => Math.round(x.taxa * 1000) / 10 },
-    ], linhas);
-  }
-
-  // ---- Bases e equipes
-
-  function renderBases(alvo) {
-    const vs = visitasFiltradas();
-    const geral = M.resumo(vs);
-    alvo.appendChild(h('div', { class: 'cabeca' },
-      h('h2', { text: 'Efetividade' }),
-      segmentado([['projetos', 'Bases (projetos)'], ['equipes', 'Equipes'], ['matriz', 'Equipe × base']], estado.subBases, (s) => { estado.subBases = s; renderPainel(); }),
-      h('span', { class: 'espaco' })
-    ));
-
-    if (estado.subBases === 'matriz') return renderMatriz(alvo, vs);
-
-    const porEquipe = estado.subBases === 'equipes';
-    const linhas = M.agruparPor(vs, porEquipe ? (v) => v.recurso : (v) => v.projeto);
-    const primeira = {
-      id: 'nome', titulo: porEquipe ? 'Equipe (recurso)' : 'Base (projeto)', tipo: 'txt', valor: (l) => l.chave,
-      render: (l) => (l.ehTotal ? 'Total' : [l.chave,
-        porEquipe && estado.tipoRecurso.get(l.chave) ? h('span', { class: 'etiqueta', text: estado.tipoRecurso.get(l.chave) }) : null,
-        l.exec > 0 && l.exec < R.minAmostra ? etiquetaPeq() : null]),
-      csv: (l) => l.chave,
-    };
-    const cols = CV.ui.colunasResumo(primeira, linhas, geral, { indice: true });
-    alvo.appendChild(CV.ui.criarTabela({
-      colunas: cols, linhas, total: Object.assign({ chave: 'Total', ehTotal: true }, geral),
-      ordem: ordemDe('bases-' + estado.subBases, { id: 'exec', dir: 'desc' }),
-      classeLinha: (l) => (l.exec < R.minAmostra ? 'pequena' : ''),
-    }));
-    if (!porEquipe && linhas.some((l) => l.chave === R.semProjeto)) {
-      const tops = M.textosAvulsas(vs, 6);
-      alvo.appendChild(h('div', { class: 'explica' },
-        h('b', { text: '“' + R.semProjeto + '”' }),
-        ' são atividades cujo texto de abertura não começa com o nome de um projeto: em geral pedidos do atendimento (call center, WhatsApp), solicitações das próprias equipes e instruções avulsas — não são uma base de alvos gerada. Os textos mais comuns:',
-        h('ul', { class: 'lista-simples' }, tops.map((t) => h('li', null, h('code', { text: t.exemplo }), ' — ' + fmt.int(t.n)))),
-        'Use “Ocultar avulsas” na barra de filtros para analisar só as bases. Se algum desses textos for, na verdade, uma base de alvos, cadastre o nome na lista ',
-        h('code', { text: 'projetos' }), ' de ', h('code', { text: 'js/regras.js' }), '.'));
-    }
-    alvo.appendChild(h('p', { class: 'nota', text: 'Índice compara a taxa de resultado da linha com a média do recorte (▲ ≥ 1,25× e ▼ ≤ 0,6×); só é calculado com ' + R.minAmostra + '+ visitas executadas. As colunas de desfecho não somam o total: uma visita pode ter mais de um desfecho (ex.: titularidade + débitos).' }));
-    alvo.appendChild(h('div', { class: 'cabeca' }, h('span', { class: 'espaco' }),
-      h('button', { class: 'btn mini', text: 'Exportar esta tabela (CSV)', on: { click: () => exportarTabela(porEquipe ? 'efetividade-equipes.csv' : 'efetividade-bases.csv', cols, linhas) } })));
-  }
-
-  function renderMatriz(alvo, vs) {
-    const exec = vs.filter((v) => v.grupoStatus === 'exec');
-    const cnt = (chave) => {
-      const m = new Map();
-      for (const v of exec) m.set(v[chave], (m.get(v[chave]) || 0) + 1);
-      return Array.from(m.entries()).sort((a, b) => b[1] - a[1]).map((x) => x[0]);
-    };
-    const projetos = cnt('projeto').slice(0, 10);
-    const recursos = cnt('recurso');
-    const matriz = M.matriz(vs, projetos, recursos);
-    let maxTaxa = 0;
-    for (const l of matriz) for (const c of l.celulas) if (c.exec >= MIN_CEL && c.taxa > maxTaxa) maxTaxa = c.taxa;
-    const tabela = h('table', { class: 'tab matriz' },
-      h('thead', null, h('tr', null, h('th', { class: 'txt sem-ordem', text: 'Equipe' }), projetos.map((p) => h('th', { class: 'sem-ordem', title: p, text: p })))),
-      h('tbody', null, matriz.map((l) => h('tr', null,
-        h('td', { class: 'txt', text: l.recurso }),
-        l.celulas.map((c) => celulaCalor(c, maxTaxa, c.exec ? `${l.recurso} · ${c.projeto}: ${c.resultado} de ${c.exec} executadas (${fmt.pct(c.taxa)})` : 'sem visitas executadas')))))
-    );
-    alvo.appendChild(h('div', { class: 'tabela-wrap' }, tabela));
-    alvo.appendChild(legendaCalor('Cada célula: % de resultado sobre as visitas executadas. Com menos de ' + MIN_CEL + ' executadas aparece "resultado/executadas", sem cor.'));
-    alvo.appendChild(h('p', { class: 'nota', text: 'Mostra as 10 bases com mais visitas executadas no recorte. Use para ver se a diferença entre equipes vem da equipe ou da base que ela recebeu.' }));
-  }
-
   // ---- Novos alvos
 
   const colTxt = (id, titulo, fn, extra) => Object.assign({ id, titulo, tipo: 'txt', valor: fn }, extra || {});
   const colNum = (id, titulo, fn, extra) => Object.assign({ id, titulo, tipo: 'num', valor: fn }, extra || {});
 
   function renderAlvos(alvo) {
-    const base = visitasSemPeriodo();
+    const base = filtrarVisitas(estado.visitas, false);
     const vs = visitasFiltradas();
     const modelo = estado.modelo;
-    const revisitar = M.alvosOcorrencia(base, modelo, 'revisitar');
-    const endereco = M.alvosOcorrencia(base, modelo, 'corrigir_endereco');
+    const todas = estado.cruzado.visitas; // o histórico inclui visitas de fora do escopo
+    const revisitar = M.alvosOcorrencia(base, modelo, 'revisitar', todas);
+    const endereco = M.alvosOcorrencia(base, modelo, 'corrigir_endereco', todas);
     const semRetorno = M.alvosSemRetorno(base, estado.cruzado.dataReferencia);
     const esgotados = M.alvosEsgotados(base);
 
@@ -858,13 +766,27 @@
 
   // ---- Auditoria
 
+  /** Como um tipo de atividade entra na conta dos tempos. */
+  function classeDoTipo(tipo) {
+    const k = N.chave(tipo);
+    const em = (lista) => lista.some((t) => N.chave(t) === k);
+    if (em(R.tempos.tiposDeslocamento)) return 'Deslocamento';
+    if (em(R.tempos.tiposOciosos)) return 'Ociosidade';
+    if (em(R.tempos.tiposApoio)) return 'Pausas e apoio';
+    return 'Serviço';
+  }
+
+  function topo(mapa, limite) {
+    return Array.from(mapa.entries()).sort((a, b) => b[1] - a[1]).slice(0, limite).map(([k, n]) => k + ' (' + fmt.int(n) + ')').join(', ');
+  }
+
   function renderAuditoria(alvo) {
     const c = estado.cruzado;
     const a = c.auditoria;
-    const at = estado.atividades.size;
-    const kv = (pares) => h('div', { class: 'kv' }, pares.map(([k, v]) => [h('div', { text: k }), h('div', { text: v })]));
+    const kv = (pares) => h('div', { class: 'kv' }, pares.map(([k, v]) => [h('div', { text: k }), h('div', { text: typeof v === 'number' ? fmt.int(v) : v })]));
+    const semZero = (pares) => pares.filter(([, v], i) => i === 0 || v > 0); // 1ª linha é o total; as demais só se houver
 
-    alvo.appendChild(h('div', { class: 'cabeca' }, h('h2', { text: 'Ajustes do cruzamento' })));
+    alvo.appendChild(h('div', { class: 'cabeca', style: { marginTop: 0 } }, h('h2', { text: 'Ajustes do cruzamento' })));
     const inJan = h('input', { class: 'campo-num', type: 'number', min: '1', max: '365', value: String(estado.janela), attrs: { 'aria-label': 'Janela em dias' } });
     inJan.addEventListener('change', () => {
       const v = Math.max(1, Math.min(365, Math.round(Number(inJan.value) || R.janelaDias)));
@@ -891,18 +813,49 @@
     alvo.appendChild(ajustes);
     alvo.appendChild(h('p', { class: 'nota', style: { margin: '0 0 8px' }, text: 'Um retorno do backoffice é ligado à visita mais recente da mesma matrícula feita até ' + estado.janela + ' dias antes dele. Se mudar a janela ou as frentes, todos os números são recalculados.' }));
 
-    alvo.appendChild(h('h3', { text: 'Atividades (alvos)' }));
+    // ---- escopo
+    const foraEquipe = new Map();
+    const foraCidade = new Map();
+    for (const v of estado.descartadas) {
+      if (!CV.escopo.equipeNoEscopo(v.recurso)) foraEquipe.set(v.recurso || '(sem equipe)', (foraEquipe.get(v.recurso || '(sem equipe)') || 0) + 1);
+      else foraCidade.set(v.cidade || '(sem cidade)', (foraCidade.get(v.cidade || '(sem cidade)') || 0) + 1);
+    }
+    const nForaEquipe = Array.from(foraEquipe.values()).reduce((x, y) => x + y, 0);
+    const nForaCidade = Array.from(foraCidade.values()).reduce((x, y) => x + y, 0);
+    alvo.appendChild(h('h3', { text: 'Escopo do painel' }));
+    alvo.appendChild(kv([
+      ['Visitas cadastrais carregadas (todas as equipes)', c.visitas.length],
+      ['Consideradas no painel (equipes e cidades do escopo)', estado.visitas.length],
+      ['De outras equipes (fora do painel)', nForaEquipe],
+      ['Das nossas equipes em outras cidades (fora do painel)', nForaCidade],
+    ]));
+    const notas = [];
+    if (foraEquipe.size) notas.push('Equipes de fora com mais visitas: ' + topo(foraEquipe, 5) + '.');
+    if (foraCidade.size) notas.push('Cidades de fora com mais visitas: ' + topo(foraCidade, 5) + '.');
+    if (notas.length) alvo.appendChild(h('p', { class: 'nota', text: notas.join(' ') }));
+    alvo.appendChild(h('p', { class: 'nota', text: 'Equipes e cidades do painel: ' + R.escopo.equipes.join(', ') + '. As cidades e as equipes ficam em js/regras.js (escopo). As visitas de fora continuam servindo para ligar os retornos pela matrícula, só não aparecem nos números.' }));
+
+    alvo.appendChild(h('h3', { text: 'Atividades' }));
     const proj = c.projetos;
-    const semZero = (pares) => pares.filter(([, v], i) => i === 0 || v > 0); // 1ª linha é o total; as demais só se houver
     alvo.appendChild(kv(semZero([
-      ['Atividades carregadas', fmt.int(at)],
-      ['Sem matrícula válida (não cruzam)', a.visitasSemMatricula],
+      ['Atividades carregadas (todos os tipos)', estado.atividades.size],
+      ['Visitas sem matrícula válida (não cruzam)', a.visitasSemMatricula],
       ['Projeto unido por semelhança de escrita', proj.porOrigem.similar],
       ['Projeto novo (sem regra cadastrada)', proj.porOrigem.novo],
       ['Demandas avulsas (sem projeto)', proj.porOrigem.sem],
-    ]).map(([k, v]) => [k, typeof v === 'number' ? fmt.int(v) : v])));
+    ])));
     const novos = proj.novos.filter((n) => !R.projetos.some((p) => p[1] === n));
     if (novos.length) alvo.appendChild(h('p', { class: 'nota', text: 'Projetos novos detectados (ainda sem regra): ' + novos.join(', ') + '.' }));
+
+    const tops = M.textosAvulsas(estado.visitas, 6);
+    if (tops.length) {
+      alvo.appendChild(h('div', { class: 'explica' },
+        h('b', { text: '“' + R.semProjeto + '”' }),
+        ' são atividades cujo texto de abertura não começa com o nome de uma base: em geral pedidos do atendimento (call center, WhatsApp), solicitações das próprias equipes e instruções avulsas. Os textos mais comuns:',
+        h('ul', { class: 'lista-simples' }, tops.map((t) => h('li', null, h('code', { text: t.exemplo }), ' — ' + fmt.int(t.n)))),
+        'Use “Ocultar avulsas” nos filtros para olhar só as bases. Se algum desses textos for, na verdade, uma base de alvos, cadastre o nome na lista ',
+        h('code', { text: 'projetos' }), ' de ', h('code', { text: 'js/regras.js' }), '.'));
+    }
 
     alvo.appendChild(h('h3', { text: 'Retornos do backoffice (planilha de Resultados)' }));
     alvo.appendChild(kv(semZero([
@@ -914,11 +867,27 @@
       ['Matrícula inválida (não é 9 dígitos)', a.matriculaInvalida],
       ['Resgatados pelo número do protocolo', a.resgatadosProtocolo],
       ['Frente de serviço desconsiderada', a.frenteIgnorada],
-    ]).map(([k, v]) => [k, typeof v === 'number' ? fmt.int(v) : v])));
+    ])));
     alvo.appendChild(h('p', { class: 'nota', text: 'Os retornos "fora das bases" são trabalho do backoffice sobre matrículas que não vieram destas bases de visita (demanda interna, outras regiões); por isso não entram na efetividade.' }));
 
+    // ---- tipos de atividade (tempos)
+    const tipos = CV.tempos.tiposPresentes(estado.agenda);
+    if (tipos.size) {
+      alvo.appendChild(h('h3', { text: 'Tipos de atividade das equipes (tempos)' }));
+      const linhas = Array.from(tipos.entries()).map(([tipo, n]) => ({ tipo, n, classe: classeDoTipo(tipo) }));
+      alvo.appendChild(CV.ui.criarTabela({
+        colunas: [
+          colTxt('tipo', 'Tipo de atividade', (l) => l.tipo),
+          colNum('n', 'Atividades', (l) => l.n),
+          colTxt('cl', 'Entra como', (l) => l.classe),
+        ],
+        linhas, ordem: { id: 'n', dir: 'desc' },
+      }));
+      alvo.appendChild(h('p', { class: 'nota', text: 'Define como cada tipo entra nos tempos das equipes (js/regras.js, tempos): refeição, DDS, checklist, carregamento, clima e abastecimento são “Pausas e apoio”; o que sobra do dia é ociosidade.' }));
+    }
+
     alvo.appendChild(h('h3', { text: 'Arquivos carregados' }));
-    const lidos = estado.arquivos.filter((a) => a.tipo !== 'ignorado');
+    const lidos = estado.arquivos.filter((x) => x.tipo !== 'ignorado');
     const ignoradosPasta = estado.arquivos.length - lidos.length;
     if (lidos.length) {
       alvo.appendChild(CV.ui.criarTabela({
@@ -965,7 +934,6 @@
     ];
     CV.csv.baixar('cruzamento-visitas-retornos.csv', cols, vs);
   }
-
   // ---------------------------------------------------------------- inicialização
 
   function ligarEntrada() {
@@ -983,6 +951,7 @@
     $('btn-escolher-pasta').addEventListener('click', cliquePasta);
     $('btn-trocar-pasta').addEventListener('click', escolherPasta);
     $('btn-exportar').addEventListener('click', exportarCruzamento);
+    $('btn-pdf').addEventListener('click', () => window.print());
     $('btn-limpar').addEventListener('click', limparTudo);
     let nivel = 0;
     const caixa = $('caixa');
@@ -1027,17 +996,15 @@
       mensagem('erro', 'Este navegador é antigo demais para ler planilhas (falta DecompressionStream). Use uma versão recente do Chrome, Edge, Firefox ou Safari.');
     }
     await restaurar();
-    if (estado.atividades.size) {
-      recalcular();
-      aplicarPreset(estado.filtros.preset);
-      estado.jaTinhaDados = true;
-      montarFiltros();
-    }
+    if (estado.atividades.size) recalcular();
     atualizarBotoes();
     renderTudo();
     window.CV_estado = estado; // útil para depuração no console
     // pasta lembrada e com acesso ainda válido: já traz o que for novo, sem precisar clicar
     if (estado.pasta && temSeletorDePasta() && (await permissaoDaPasta(false))) await lerPasta(true);
+    if (estado.precisaRelerPasta && !estado.atividades.size) {
+      mensagem('aviso', 'O painel foi atualizado (agora com horários, equipes e cidades). Os dados guardados antes precisam ser lidos de novo: clique em “' + (estado.pasta ? 'Atualizar' : 'Carregar pasta') + '”.');
+    }
   }
 
   iniciar();

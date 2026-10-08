@@ -30,6 +30,11 @@
     categoria: ['Categoria'],
     qtdEcon: ['Quantidade De Economia'],
     situacao: ['Situação Do Imóvel'],
+    // horários (para os tempos das equipes)
+    inicio: ['Início'],
+    fim: ['Fim'],
+    duracao: ['Duração'],
+    desloc: ['Tempo de Deslocamento'],
   };
   const OBRIGATORIOS_ATIVIDADES = ['id', 'mat', 'data', 'recurso', 'status'];
 
@@ -101,24 +106,34 @@
       categoria: N().texto(r.categoria),
       qtdEcon: qtdEconomias(r.qtdEcon),
       situacao: N().texto(r.situacao),
+      inicio: N().minutos(r.inicio),
+      fim: N().minutos(r.fim),
+      duracao: N().minutos(r.duracao),
+      desloc: N().minutos(r.desloc),
     };
   }
 
+  /** A atividade é um alvo de visita cadastral (o que alimenta os resultados)? Sem tipo informado, sim. */
+  function ehCadastral(tipo) {
+    const aceitos = CV.regras.tiposAtividade;
+    if (!tipo || !aceitos.length) return true;
+    const k = N().chave(tipo);
+    return aceitos.some((t) => k.startsWith(N().chave(t)));
+  }
+
   /**
-   * Limpa as linhas lidas do arquivo e separa o que não serve.
-   * Retorna { limpas, descartes: { semId, semData, tipoIgnorado: {tipo: n} } }.
+   * Limpa as linhas lidas do arquivo.
+   *  - visitas cadastrais de QUALQUER equipe ficam (servem para ligar os retornos pela matrícula);
+   *  - as demais atividades (refeição, DDS, carregamento, clima, cobrança...) só ficam se forem de
+   *    uma equipe do escopo: servem para calcular os tempos das equipes.
+   * Retorna { limpas, descartes: { semId, semData, outrosServicos: n } }.
    */
   function limparAtividades(linhas) {
-    const R = CV.regras;
-    const aceitos = R.tiposAtividade.map((t) => N().chave(t));
-    const descartes = { semId: 0, semData: 0, tipoIgnorado: {} };
+    const descartes = { semId: 0, semData: 0, outrosServicos: 0 };
     const limpas = [];
     for (const raw of linhas) {
       const a = limparAtividade(raw);
-      if (a.tipo && aceitos.length && !aceitos.some((t) => N().chave(a.tipo).startsWith(t))) {
-        descartes.tipoIgnorado[a.tipo] = (descartes.tipoIgnorado[a.tipo] || 0) + 1;
-        continue;
-      }
+      if (!ehCadastral(a.tipo) && !CV.escopo.equipeNoEscopo(a.recurso)) { descartes.outrosServicos++; continue; }
       if (!a.id) { descartes.semId++; continue; }
       if (!a.data) { descartes.semData++; continue; }
       limpas.push(a);
@@ -145,7 +160,7 @@
     const R = CV.regras;
     const extrator = CV.projetos.criarExtrator(R);
     const porProjeto = { regra: 0, similar: 0, novo: 0, sem: 0 };
-    const visitas = limpas.map((a) => {
+    const visitas = limpas.filter((a) => ehCadastral(a.tipo)).map((a) => {
       let proj = { nome: R.semProjeto, rotulo: null, origem: 'sem' };
       const textos = { 'Observação': a.obs, 'Parecer De Campo': a.parecer };
       for (const col of R.colunasProjeto) {
@@ -204,7 +219,7 @@
   CV.dados = {
     CAMPOS_ATIVIDADES, OBRIGATORIOS_ATIVIDADES, CAMPOS_RESULTADOS, OBRIGATORIOS_RESULTADOS, ROTULOS,
     detectarTipo, limparAtividades, derivarVisitas, limparResultados, derivarResultados,
-    qtdEconomias, rotuloQtdEcon, grupoStatus, tipoEquipe,
+    qtdEconomias, rotuloQtdEcon, grupoStatus, tipoEquipe, ehCadastral,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = CV.dados;
 })(typeof window !== 'undefined' ? window : globalThis);

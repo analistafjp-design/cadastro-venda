@@ -12,14 +12,14 @@ test('limpar atividades: normaliza matrícula, data, quantidade de economias e d
     { mat: 100000104, data: '05/10/26', recurso: 'R', status: 'Finalizada', tipo: 'Verificação Cadastral' },
     { id: 5, mat: 100000105, data: '05/10/26', recurso: 'R', status: 'Cancelada', tipo: 'Corte e Religação Cavalete' },
   ]);
-  assert.equal(r.limpas.length, 2);
+  assert.equal(r.limpas.length, 2); // a de outro tipo e de equipe fora do escopo é descartada
   assert.equal(r.limpas[0].mat, '100000101');
   assert.equal(r.limpas[0].data, '2026-10-05');
   assert.equal(r.limpas[0].recurso, 'RIORECIN-004');
   assert.equal(r.limpas[0].qtdEcon, 4);
   assert.equal(r.limpas[0].protocolo, '3000001');
   assert.equal(r.limpas[1].id, '2');
-  assert.deepEqual(r.descartes, { semId: 1, semData: 1, tipoIgnorado: { 'Corte e Religação Cavalete': 1 } });
+  assert.deepEqual(r.descartes, { semId: 1, semData: 1, outrosServicos: 1 });
 });
 
 test('qtdEconomias e rótulo', () => {
