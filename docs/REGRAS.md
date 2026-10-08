@@ -15,7 +15,8 @@ Os arquivos são lidos **pelo nome do cabeçalho** (sem diferenciar maiúsculas,
 | Data | Data da visita (aceita data do Excel, `dd/mm/aa` e `dd/mm/aaaa`) | sim |
 | Recurso | Equipe (ex.: `RIORECIN-004`) | sim |
 | Status da Atividade | Executada / ocorrência / outras | sim |
-| Tipo de Atividade | Só *Verificação Cadastral* entra (as demais, como corte, são ignoradas e contadas) | não |
+| Tipo de Atividade | *Verificação Cadastral* (e venda) são as visitas. As demais (corte...) só ficam se forem de uma equipe do escopo, para os tempos | não |
+| Início, Fim, Duração, Tempo de Deslocamento | Horários de cada atividade (aba *Tempos das equipes*) | não |
 | Observação | **Nome do projeto/base** (`PROJETO XXXX: ...`) | não* |
 | Parecer De Campo | Alternativa de leitura do projeto quando a *Observação* não traz um | não |
 | Cód. Protocolo Origem | Resgatar retornos lançados com o protocolo no lugar da matrícula | não |
@@ -38,7 +39,15 @@ Os arquivos são lidos **pelo nome do cabeçalho** (sem diferenciar maiúsculas,
 | TIPO DE ORDEM DE SERVIÇO, QUAL FOI A ALTERAÇÃO DE ECONOMIA?, TRATATIVA CADASTRAL, TIPO DE ALTERAÇÃO | Definem o desfecho |
 | DE:, PARA: | Quantas economias foram acrescidas/retiradas |
 
-## 1.1 Leitura de uma pasta
+## 1.1 Escopo do painel
+
+O painel considera só as **10 equipes** e as **12 cidades** da operação (`escopo` em `regras.js`; as 12 cidades são as que aparecem no arquivo do Interior, com as grafias alternativas). Equipes de outros serviços e cidades de outras regiões (ex.: São Gonçalo, Itaboraí) **não entram nos números**.
+
+- O filtro é aplicado **depois** do cruzamento: todas as visitas ajudam a ligar o retorno à matrícula, mas só as do escopo aparecem. A Auditoria mostra quantas ficaram de fora e quais as equipes/cidades com mais visitas.
+- Atividades de outros tipos (refeição, DDS...) só são guardadas para equipes do escopo.
+- Lista vazia em `escopo` = sem filtro.
+
+## 1.2 Leitura de uma pasta
 
 - Percorre a pasta e as subpastas (até 8 níveis), olhando só arquivos `.xlsx`. Ignora temporários do Excel (`~$...`), arquivos e pastas ocultos (que começam com `.`) e outros formatos.
 - **Reconhece o tipo pelo cabeçalho**, não pelo nome do arquivo: tem "ID da Atividade" e "Status da Atividade" → Atividades; tem "MATRICULA S/ DIGITO" (ou "Hora de início" + "Tipo de Ordem de Serviço") → Resultados. Qualquer outra planilha é ignorada e anotada, para não ser aberta de novo.
@@ -125,7 +134,9 @@ Cada retorno cai em exatamente um destes baldes (a Auditoria mostra os números 
 | Métrica | Definição |
 |---|---|
 | Atividades | Todas as linhas de visita (alvos gerados), por data da visita |
-| Executadas | Status *Finalizada* |
+| Percorrido | Exec + Exoc: visitas em que a equipe foi ao local |
+| Exec / Executadas | Status *Finalizada* |
+| Exoc | Status *Encerrada com Ocorrência* |
 | % Exec. | Executadas ÷ Atividades |
 | Com retorno | Executadas com ao menos um retorno atribuído |
 | Resultado | Executadas cujo retorno é do grupo *resultado* |
@@ -137,7 +148,32 @@ Cada retorno cai em exatamente um destes baldes (a Auditoria mostra os números 
 | Índice | % Resultado da linha ÷ % Resultado geral (só com 10+ executadas) |
 
 - As colunas de desfecho (Incremento, Categoria...) contam visitas que **incluem** aquele desfecho; uma visita pode ter mais de um, então não somam o total.
+
+**Tipos de resultado (cards e “+” de cada equipe).** Cada visita com resultado entra em um ou mais tipos:
+
+| Tipo | Quando |
+|---|---|
+| Incremento de economia | incremento, sem alteração de categoria |
+| Incremento de economia e alteração de categoria | o mesmo retorno traz economia e categoria |
+| Alteração de categoria | só categoria |
+| Troca de titularidade, Tarifa social, Fatura digital, Venda / ligação nova, Negociação de débitos, Decremento | o desfecho correspondente |
+
+*Total de incremento* = incremento + incremento e categoria. *Total alteração de categoria* = categoria + incremento e categoria. *Outros resultados* = com resultado, mas sem incremento, categoria nem titularidade.
 - **Em maturação:** visitas dos últimos 3 dias (contados a partir do último retorno carregado). O backoffice leva em média 1 a 3 dias para lançar, então a taxa dessas datas ainda vai subir.
+
+## 6.1 Tempos das equipes
+
+Calculados por equipe e por dia, em minutos, com as atividades que têm horário (canceladas e pendentes ficam de fora):
+
+| Tempo | Definição |
+|---|---|
+| Dia | do início da 1ª atividade (menos o deslocamento até ela) ao fim da última |
+| Deslocamento | soma de *Tempo de Deslocamento* de cada atividade (+ atividades do tipo *Deslocamento*) |
+| Serviço | duração das atividades de serviço (visitas, vendas, cobrança, manobra...) |
+| Pausas e apoio | duração de refeição, checklist de início, DDS, carregamento de material, condição climática e abastecimento (`tempos.tiposApoio`) |
+| Ociosidade | o que sobra do dia depois de deslocamento, serviço e apoio |
+
+A aba mostra a **média por dia trabalhado** ou o **total do período**. Como o almoço e as paradas só existem na exportação completa do sistema, um dia só com visitas deixaria essas pausas virarem ociosidade: por isso o padrão é contar só os **dias completos** (dias em que a equipe tem também atividades que não são visita) e há a opção *Todos os dias*. Quais tipos são apoio, e se algum conta como ocioso (`tiposOciosos`), está em `regras.js`.
 
 ## 7. Listas de novos alvos
 

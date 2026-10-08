@@ -5,10 +5,10 @@ const { carregarFixtures } = require('./helpers');
 
 // Cenários documentados em tests/fixtures/gerar.py
 
-test('limpeza: atividade de outro tipo é ignorada e contada', async () => {
+test('limpeza: serviço de outra equipe (fora do escopo) é descartado e contado; visitas cadastrais ficam', async () => {
   const { la } = await carregarFixtures();
-  assert.equal(la.limpas.length, 16);
-  assert.deepEqual(la.descartes.tipoIgnorado, { 'Corte e Religação Cavalete': 1 });
+  assert.equal(la.limpas.length, 16); // as 16 visitas cadastrais; o corte da equipe RIOCORTE-001 saiu
+  assert.equal(la.descartes.outrosServicos, 1);
   assert.equal(la.descartes.semId, 0);
 });
 

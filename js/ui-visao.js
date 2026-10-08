@@ -1,0 +1,230 @@
+/*
+ * ui-visao.js — as duas páginas principais:
+ *   Visão geral      : cards (Percorrido, Exec, Exoc, Com resultados, tipos de resultado),
+ *                      bases, resultado por equipe (com "+" para abrir os serviços) e por data.
+ *   Tempos das equipes: deslocamento, serviço, pausas/apoio e ociosidade.
+ */
+(function (global) {
+  'use strict';
+  const CV = (global.CV = global.CV || {});
+  const ui = CV.ui;
+  const { h, fmt } = ui;
+  const M = () => CV.metricas;
+  const N = () => CV.normalize;
+
+  const secao = (texto) => h('div', { class: 'secao', text: texto });
+
+  /** Card no estilo do painel Pós-Corte: bolinha colorida + rótulo, número grande. */
+  function cartao(rotulo, valor, cor, dica, sub) {
+    return h('div', { class: 'cartao', title: dica || null },
+      h('div', { class: 'rot' }, h('i', { class: 'dot', style: { background: cor } }), rotulo),
+      h('div', { class: 'valor', text: valor }),
+      sub ? h('div', { class: 'sub', text: sub }) : null);
+  }
+
+  function bloco(titulo, descricao, extras) {
+    return h('section', { class: 'bloco' },
+      h('div', { class: 'topo-bloco' },
+        h('div', null, h('h2', { text: titulo }), descricao ? h('p', { class: 'desc', text: descricao }) : null),
+        h('span', { class: 'espaco' }),
+        extras || null));
+  }
+
+  function segmentado(opcoes, atual, aoMudar, rotulo) {
+    return h('div', { class: 'segmentado', role: 'group', 'aria-label': rotulo || null },
+      opcoes.map(([id, nome]) => h('button', { type: 'button', text: nome, attrs: { 'aria-pressed': String(atual === id) }, on: { click: () => aoMudar(id) } })));
+  }
+
+  const celulaTaxa = (taxa, max) => h('td', { class: 'taxa' }, h('div', { class: 'celula' },
+    taxa && max ? h('span', { class: 'barra', style: { width: Math.max(2, (taxa / max) * 100) + '%' } }) : null,
+    h('span', { class: 'valor', text: fmt.pct(taxa) })));
+
+  // ======================================================================= Visão geral
+
+  /**
+   * ctx: { vs (visitas já filtradas), equipes (nomes do escopo), gran, aoMudarGran(g),
+   *        ordemDe(id, padrao), abertas (Set de equipes abertas) }
+   */
+  function renderVisao(alvo, ctx) {
+    const R = CV.regras;
+    const c = M().cartoes(ctx.vs);
+
+    alvo.appendChild(secao('Resultado'));
+    alvo.appendChild(h('div', { class: 'cartoes' },
+      cartao('Percorrido', fmt.int(c.percorrido), 'var(--c-cinza)', 'Exec + Exoc: visitas em que a equipe foi ao local'),
+      cartao('Exec', fmt.int(c.exec), 'var(--c-azul)', 'Atividades finalizadas'),
+      cartao('Exoc', fmt.int(c.oc), 'var(--c-laranja)', 'Encerradas com ocorrência (cliente ausente, endereço não localizado...)'),
+      cartao('Com resultados', fmt.int(c.resultado), 'var(--c-verde)', 'Exec que geraram mudança de valor: incremento, categoria, titularidade, venda, tarifa social...'),
+      cartao('Taxa de resultado', fmt.pct(c.taxa), 'var(--c-roxo)', 'Com resultados ÷ Exec', 'Com resultados ÷ Exec')
+    ));
+
+    alvo.appendChild(secao('Tipo de resultado'));
+    const tipos = [
+      cartao('Incremento de economia', fmt.int(c.inc), 'var(--c-azul)', 'Só incremento de economia, sem alteração de categoria'),
+      cartao('Incremento de economia e alteração de categoria', fmt.int(c.incCat), 'var(--c-roxo)', 'Mesmo retorno com economia e categoria alteradas'),
+      cartao('Total de incremento', fmt.int(c.totalInc), 'var(--c-azul-esc)', 'Incremento de economia + incremento e alteração de categoria'),
+      cartao('Total alteração de categoria', fmt.int(c.totalCat), 'var(--c-verde)', 'Alteração de categoria (inclui a que veio com incremento)'),
+      cartao('Troca de titularidade', fmt.int(c.titular), 'var(--c-laranja)', 'Troca de titular da matrícula'),
+    ];
+    if (c.outros > 0) tipos.push(cartao('Outros resultados', fmt.int(c.outros), 'var(--c-claro)', 'Tarifa social, fatura digital, venda, negociação de débitos, decremento...'));
+    alvo.appendChild(h('div', { class: 'cartoes' }, tipos));
+
+    // ------------------------------------------------------------- Bases
+    const linhasBase = M().agruparPor(ctx.vs, (v) => v.projeto).filter((l) => l.percorrido > 0);
+    const colsBase = [
+      { id: 'base', titulo: 'Base', tipo: 'txt', valor: (l) => l.chave },
+      { id: 'perc', titulo: 'Percorrido', tipo: 'num', valor: (l) => l.percorrido, dica: 'Exec + Exoc' },
+      { id: 'res', titulo: 'Com resultados', tipo: 'num', valor: (l) => l.resultado },
+      { id: 'taxa', titulo: '% de resultado', tipo: 'taxa', valor: (l) => l.taxaResultado, dica: 'Com resultados ÷ Exec' },
+    ];
+    const blocoBase = bloco('Bases', 'Resultado de cada base de alvos (projeto) no período.');
+    blocoBase.appendChild(ui.criarTabela({ colunas: colsBase, linhas: linhasBase, ordem: ctx.ordemDe('visao-bases', { id: 'res', dir: 'desc' }), vazio: 'Nenhuma visita no período.' }));
+    if (linhasBase.some((l) => l.chave === R.semProjeto)) {
+      blocoBase.appendChild(h('p', { class: 'nota', text: '“' + R.semProjeto + '” são demandas que não pertencem a uma base (pedidos do atendimento, solicitações das próprias equipes). Veja os textos na aba Auditoria.' }));
+    }
+    alvo.appendChild(blocoBase);
+
+    // ------------------------------------------------------------- Resultado por equipe
+    const equipes = M().resultadoPorEquipe(ctx.vs, ctx.equipes);
+    const maxTaxa = equipes.reduce((m, e) => Math.max(m, e.taxa || 0), 0);
+    const maxServico = (e) => e.tipos.reduce((m, t) => Math.max(m, t.n), 0);
+    const corpo = h('tbody');
+    for (const e of equipes) {
+      const aberta = ctx.abertas.has(e.recurso);
+      const linhaServicos = h('tr', { class: 'servicos', hidden: !aberta },
+        h('td', { colSpan: 3 },
+          e.tipos.length
+            ? h('ul', null, e.tipos.map((t) => h('li', null,
+              h('span', { class: 'rotulo', text: t.rotulo }),
+              h('span', { class: 'barra-s', style: { width: Math.max(6, (t.n / maxServico(e)) * 140) + 'px' } }),
+              h('span', { class: 'qtd', text: fmt.int(t.n) }))))
+            : h('span', { class: 'vazio-s', text: 'Nenhum serviço trouxe resultado no período.' })));
+      const botao = e.resultado > 0
+        ? h('button', {
+          type: 'button', class: 'mais', text: aberta ? '−' : '+', title: 'Ver os serviços que trouxeram resultado',
+          attrs: { 'aria-expanded': String(aberta), 'aria-label': 'Serviços que trouxeram resultado: ' + e.recurso },
+          on: {
+            click: (ev) => {
+              const abrir = linhaServicos.hidden;
+              linhaServicos.hidden = !abrir;
+              ev.currentTarget.textContent = abrir ? '−' : '+';
+              ev.currentTarget.setAttribute('aria-expanded', String(abrir));
+              if (abrir) ctx.abertas.add(e.recurso); else ctx.abertas.delete(e.recurso);
+            },
+          },
+        })
+        : null;
+      corpo.appendChild(h('tr', { class: 'equipe' },
+        h('td', { class: 'txt' }, h('span', { class: 'nome-equipe', text: e.recurso, title: fmt.int(e.exec) + ' Exec' }), botao),
+        h('td', { class: 'num' + (e.resultado ? '' : ' zero'), text: fmt.int(e.resultado) }),
+        celulaTaxa(e.taxa, maxTaxa)));
+      corpo.appendChild(linhaServicos);
+    }
+    const blocoEq = bloco('Resultado por equipe', 'Só o que trouxe resultado, por equipe do cadastro (RIORECIN) e da venda (RIOVENIN). Use o “+” sob o nome para abrir os serviços e as quantidades.');
+    blocoEq.appendChild(h('div', { class: 'tabela-wrap' }, h('table', { class: 'tab' },
+      h('thead', null, h('tr', null,
+        h('th', { class: 'txt sem-ordem', text: 'Equipe' }),
+        h('th', { class: 'sem-ordem', text: 'Com resultados' }),
+        h('th', { class: 'sem-ordem', text: '% de resultado', title: 'Com resultados ÷ Exec da equipe' }))),
+      corpo)));
+    alvo.appendChild(blocoEq);
+
+    // ------------------------------------------------------------- Por data
+    const gran = ctx.gran;
+    const linhasData = M().porPeriodo(ctx.vs, gran).filter((l) => l.percorrido > 0);
+    const rotulo = (l) => {
+      if (gran === 'mes') return fmt.mes(l.chave + '-01');
+      if (gran === 'semana') return fmt.curta(l.chave) + ' a ' + fmt.curta(N().somaDias(l.chave, 6));
+      return N().diaDaSemana(l.chave) + ' ' + fmt.longa(l.chave);
+    };
+    const colsData = [
+      {
+        id: 'data', titulo: gran === 'dia' ? 'Data da visita' : gran === 'semana' ? 'Semana (seg–dom)' : 'Mês', tipo: 'txt',
+        valor: (l) => l.chave, ordena: (l) => l.chave,
+        render: (l) => [rotulo(l), l.maturando > 0 ? h('span', { class: 'etiqueta mat', text: 'em maturação', title: 'Os retornos do backoffice ainda estão chegando: a taxa tende a subir.' }) : null],
+      },
+      { id: 'perc', titulo: 'Percorrido', tipo: 'num', valor: (l) => l.percorrido },
+      { id: 'exec', titulo: 'Exec', tipo: 'num', valor: (l) => l.exec },
+      { id: 'exoc', titulo: 'Exoc', tipo: 'num', valor: (l) => l.oc },
+      { id: 'res', titulo: 'Com resultados', tipo: 'num', valor: (l) => l.resultado },
+      { id: 'taxa', titulo: '% de resultado', tipo: 'taxa', valor: (l) => l.taxaResultado },
+    ];
+    const blocoData = bloco('Por data', 'Cada visita é contada no dia em que aconteceu. Datas recentes ficam “em maturação”: o backoffice leva de 1 a 3 dias para lançar o retorno.',
+      segmentado([['dia', 'Dia'], ['semana', 'Semana'], ['mes', 'Mês']], gran, ctx.aoMudarGran, 'Agrupar por'));
+    blocoData.appendChild(ui.criarTabela({ colunas: colsData, linhas: linhasData, ordem: ctx.ordemDe('visao-data-' + gran, { id: 'data', dir: 'desc' }), vazio: 'Nenhuma visita no período.' }));
+    alvo.appendChild(blocoData);
+  }
+
+  // ======================================================================= Tempos das equipes
+
+  const CORES_TEMPO = { desloc: 'var(--c-azul)', servico: 'var(--c-verde)', apoio: 'var(--c-claro)', ocioso: 'var(--c-laranja)' };
+
+  /**
+   * ctx: { agenda (já filtrada por período/equipe), equipes (nomes do escopo), modo: 'media'|'total',
+   *        aoMudarModo(m), soCompletos, aoMudarCompletos(bool), ordemDe(id, padrao) }
+   */
+  function renderTempos(alvo, ctx) {
+    const todas = CV.tempos.porEquipe(ctx.agenda);
+    const haCompletos = todas.some((l) => l.diasCompletos > 0);
+    // sem nenhum dia completo no período, contar todos os dias (e avisar)
+    const soCompletos = ctx.soCompletos && haCompletos;
+    const por = soCompletos ? CV.tempos.porEquipe(ctx.agenda, { soCompletos: true }) : todas;
+    const chave = (r) => N().chave(r).replace(/ /g, '');
+    const mapa = new Map(por.map((l) => [chave(l.recurso), l]));
+    const linhas = ctx.equipes.map((nome) => {
+      const l = mapa.get(chave(nome));
+      return { recurso: nome, dias: l ? l.dias : 0, diasTodos: l ? l.diasTodos : 0, media: l ? l.media : null, total: l ? l.total : null };
+    });
+    const pega = (l, k) => (l.dias ? (ctx.modo === 'media' ? l.media[k] : l.total[k]) : null);
+    const colTempo = (id, titulo, k, dica) => ({ id, titulo, tipo: 'num', valor: (l) => pega(l, k), render: (l) => N().hhmm(pega(l, k)), dica });
+    const cols = [
+      { id: 'equipe', titulo: 'Equipe', tipo: 'txt', valor: (l) => l.recurso },
+      {
+        id: 'dias', titulo: 'Dias', tipo: 'num', valor: (l) => l.dias,
+        render: (l) => (soCompletos && l.diasTodos ? l.dias + ' de ' + l.diasTodos : fmt.int(l.dias)),
+        dica: soCompletos ? 'Dias contados (com agenda completa) de todos os dias com horário no período' : 'Dias com atividade com horário no período',
+      },
+      colTempo('desloc', 'Deslocamento', 'desloc', 'Soma do “Tempo de Deslocamento” das atividades'),
+      colTempo('servico', 'Serviço', 'servico', 'Duração das atividades de serviço (visitas, vendas, cobrança...)'),
+      colTempo('apoio', 'Pausas e apoio', 'apoio', 'Refeição, DDS, checklist, carregamento de material, clima e abastecimento'),
+      colTempo('ocioso', 'Ociosidade', 'ocioso', 'O que sobra do dia depois de deslocamento, serviço e apoio'),
+      {
+        id: 'dist', titulo: 'Como o dia foi usado', tipo: 'txt', sem_ordem: true, valor: () => null,
+        render: (l) => {
+          if (!l.dias || !l.total.dia) return '';
+          const t = l.total;
+          const pc = (v) => Math.max(0, (v / t.dia) * 100);
+          return h('div', { class: 'dist', title: ['Deslocamento', 'Serviço', 'Pausas e apoio', 'Ociosidade'].map((n, i) => n + ' ' + fmt.pct([t.desloc, t.servico, t.apoio, t.ocioso][i] / t.dia)).join(' · ') },
+            ['desloc', 'servico', 'apoio', 'ocioso'].map((k) => h('i', { style: { width: pc(t[k]) + '%', background: CORES_TEMPO[k] } })));
+        },
+      },
+    ];
+    const blocoT = bloco('Tempos das equipes',
+      'Deslocamento, serviço e ociosidade de cada equipe, em horas:minutos. ' + (ctx.modo === 'media' ? 'Média por dia trabalhado.' : 'Soma no período.'),
+      h('div', { class: 'grupo-seg' },
+        segmentado([['completos', 'Dias completos'], ['todos', 'Todos os dias']], ctx.soCompletos ? 'completos' : 'todos', (v) => ctx.aoMudarCompletos(v === 'completos'), 'Dias considerados'),
+        segmentado([['media', 'Média por dia'], ['total', 'Total no período']], ctx.modo, ctx.aoMudarModo, 'Medida')));
+    blocoT.appendChild(ui.criarTabela({ colunas: cols, linhas, ordem: ctx.ordemDe('tempos', { id: 'equipe', dir: 'asc' }), vazio: 'Sem atividades com horário no período.' }));
+    blocoT.appendChild(h('div', { class: 'legenda' }, [
+      ['desloc', 'Deslocamento'], ['servico', 'Serviço'], ['apoio', 'Pausas e apoio'], ['ocioso', 'Ociosidade'],
+    ].map(([k, n]) => h('span', null, h('i', { style: { background: CORES_TEMPO[k] } }), n))));
+    blocoT.appendChild(h('p', { class: 'nota', text: 'Dia = do início da primeira atividade (menos o deslocamento até ela) ao fim da última. Ociosidade = o que sobra do dia depois de deslocamento, serviço e pausas/apoio. Atividades canceladas ou sem horário não contam.' }));
+
+    if (!ctx.agenda.length) {
+      blocoT.appendChild(h('p', { class: 'explica' }, h('b', { text: 'Sem horários no período. ' }),
+        'Os tempos usam as colunas Início, Fim, Duração e Tempo de Deslocamento das atividades das equipes; se o período escolhido não tem atividades com horário (ou os arquivos não trazem essas colunas), a tabela fica vazia.'));
+    } else if (!haCompletos) {
+      blocoT.appendChild(h('p', { class: 'explica' }, h('b', { text: 'Atenção: ' }),
+        'nenhum dia deste período tem refeição, DDS, carregamento e outras atividades de apoio (só visitas cadastrais). Nesses dias o horário de almoço e as paradas entram como ociosidade, então a ociosidade fica acima do real. Para um número fiel, carregue a exportação completa do sistema (todos os tipos de atividade).'));
+    } else {
+      blocoT.appendChild(h('p', { class: 'nota', text: soCompletos
+        ? '“Dias completos” são os dias em que a equipe tem também refeição, DDS, carregamento etc. registrados (exportação completa do sistema). Nos outros dias só há visitas e o almoço viraria ociosidade; escolha “Todos os dias” para incluí-los.'
+        : 'Atenção: em “Todos os dias” entram dias só com visitas, sem refeição e paradas registradas; neles o almoço conta como ociosidade, o que deixa a ociosidade acima do real.' }));
+    }
+    alvo.appendChild(blocoT);
+  }
+
+  ui.renderVisao = renderVisao;
+  ui.renderTempos = renderTempos;
+  if (typeof module !== 'undefined' && module.exports) module.exports = ui;
+})(typeof window !== 'undefined' ? window : globalThis);

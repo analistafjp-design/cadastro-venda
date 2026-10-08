@@ -131,58 +131,6 @@ test('territórios: índice relativo à média e corte por amostra mínima', asy
   assert.equal(M().territorios(out.visitas, (v) => v.cidade, 100).linhas.length, 0);
 });
 
-test('matriz equipe × projeto', async () => {
-  const { out } = await carregarFixtures();
-  const m = M().matriz(out.visitas, ['INCREMENTO', 'TITULARIDADE'], ['RIOVENIN-001', 'RIORECIN-001']);
-  const cel = (rec, proj) => m.find((x) => x.recurso === rec).celulas.find((c) => c.projeto === proj);
-  assert.equal(cel('RIOVENIN-001', 'TITULARIDADE').exec, 2);
-  assert.equal(cel('RIOVENIN-001', 'TITULARIDADE').resultado, 2);
-  assert.equal(cel('RIOVENIN-001', 'TITULARIDADE').taxa, 1);
-  assert.equal(cel('RIORECIN-001', 'TITULARIDADE').taxa, null);
-});
-
-test('resultado por equipe em cada período: colunas do mais recente ao mais antigo', async () => {
-  const { out } = await carregarFixtures();
-  const mx = M().matrizPeriodos(out.visitas, 'dia');
-  assert.deepEqual(mx.periodos, ['2026-03-12', '2026-03-10', '2026-03-06', '2026-03-05', '2026-03-02']);
-  assert.deepEqual(mx.linhas.map((l) => l.recurso), ['RIORECIN-001', 'RIORECIN-002', 'RIOVENIN-001']);
-  const linha = (rec) => mx.linhas.find((l) => l.recurso === rec);
-  const cel = (rec, dia) => linha(rec).celulas.find((c) => c.chave === dia);
-
-  // RIORECIN-001: 3 executadas em 02/03 (1 com resultado), 1 em 10/03 e 1 em 12/03
-  assert.equal(cel('RIORECIN-001', '2026-03-02').exec, 3);
-  assert.equal(cel('RIORECIN-001', '2026-03-02').resultado, 1);
-  assert.equal(cel('RIORECIN-001', '2026-03-10').exec, 1);
-  assert.equal(cel('RIORECIN-001', '2026-03-10').resultado, 0); // só atualização cadastral
-  // RIORECIN-002: a ocorrência (visita 20) não conta; 4 executadas em 06/03, 2 com resultado
-  assert.equal(cel('RIORECIN-002', '2026-03-06').exec, 4);
-  assert.equal(cel('RIORECIN-002', '2026-03-06').resultado, 2);
-  assert.equal(cel('RIORECIN-002', '2026-03-06').taxa, 0.5);
-  // célula sem visita: taxa nula, não zero
-  assert.equal(cel('RIOVENIN-001', '2026-03-12').exec, 0);
-  assert.equal(cel('RIOVENIN-001', '2026-03-12').taxa, null);
-  // totais por equipe
-  assert.equal(linha('RIOVENIN-001').exec, 4);
-  assert.equal(linha('RIOVENIN-001').resultado, 3);
-  assert.equal(linha('RIOVENIN-001').tipo, 'Venda');
-  // o conjunto das equipes fecha com o resumo geral
-  assert.equal(mx.total.exec, 14);
-  assert.equal(mx.total.resultado, 6);
-  assert.equal(mx.linhas.reduce((s, l) => s + l.exec, 0), mx.total.exec);
-  assert.equal(mx.linhas.reduce((s, l) => s + l.celulas.reduce((t, c) => t + c.exec, 0), 0), mx.total.exec);
-});
-
-test('resultado por equipe agrupado por semana e por mês', async () => {
-  const { out } = await carregarFixtures();
-  const sem = M().matrizPeriodos(out.visitas, 'semana');
-  assert.deepEqual(sem.periodos, ['2026-03-09', '2026-03-02']);
-  const l1 = sem.linhas.find((l) => l.recurso === 'RIORECIN-001');
-  assert.deepEqual(l1.celulas.map((c) => c.exec), [2, 3]); // 10/03 e 12/03 | 02/03
-  const mes = M().matrizPeriodos(out.visitas, 'mes');
-  assert.deepEqual(mes.periodos, ['2026-03']);
-  assert.equal(mes.linhas[0].celulas[0].exec, mes.linhas[0].exec);
-});
-
 test('demandas avulsas: o que são e como ocultar', async () => {
   const { out } = await carregarFixtures();
   const avulsas = M().textosAvulsas(out.visitas, 5);
@@ -193,4 +141,86 @@ test('demandas avulsas: o que são e como ocultar', async () => {
   assert.equal(M().filtrar(out.visitas, { semAvulsas: true }).length, todas - 1);
   assert.equal(M().filtrar(out.visitas, { semAvulsas: false }).length, todas);
   assert.equal(M().textosAvulsas(M().filtrar(out.visitas, { semAvulsas: true }), 5).length, 0);
+});
+
+test('tipos de resultado: economia + categoria no mesmo retorno vira "incremento e categoria"', () => {
+  const tp = (...tags) => M().tiposDoResultado({ tags });
+  assert.deepEqual(tp('incremento'), ['inc']);
+  assert.deepEqual(tp('categoria'), ['cat']);
+  assert.deepEqual(tp('categoria', 'economia'), ['inc_cat']); // "Alteração de categoria e economia"
+  assert.deepEqual(tp('incremento', 'categoria'), ['inc_cat']);
+  assert.deepEqual(tp('titularidade', 'debitos'), ['titular', 'debitos']);
+  assert.deepEqual(tp('categoria', 'titularidade'), ['cat', 'titular']);
+  assert.deepEqual(tp('decremento'), ['decr']);
+  assert.deepEqual(tp('economia'), ['eco']);
+  assert.deepEqual(tp('tarifa_social'), ['tarifa']);
+  assert.deepEqual(tp('atualizacao'), []);
+  assert.deepEqual(tp('sem'), []);
+});
+
+test('cards: percorrido = exec + exoc; totais de incremento e categoria; titularidade; outros', async () => {
+  const { out } = await carregarFixtures();
+  const c = M().cartoes(out.visitas);
+  assert.equal(c.percorrido, 16);
+  assert.equal(c.exec, 14);
+  assert.equal(c.oc, 2);
+  assert.equal(c.percorrido, c.exec + c.oc);
+  assert.equal(c.resultado, 6);
+  assert.equal(c.inc, 2); // visitas 1 e 11
+  assert.equal(c.incCat, 0);
+  assert.equal(c.totalInc, 2);
+  assert.equal(c.totalCat, 1); // visita 4
+  assert.equal(c.titular, 2); // visitas 7 e 15
+  assert.equal(c.outros, 1); // decremento da visita 12
+  assert.ok(Math.abs(c.taxa - 6 / 14) < 1e-12);
+});
+
+test('cards: totais somam corretamente quando há retorno de economia e categoria juntos', () => {
+  const v = (tags) => ({ grupoStatus: 'exec', grupoRetorno: 'resultado', tags, mat: 'x' + Math.random(), deltaEcon: 0 });
+  const c = M().cartoes([
+    v(['incremento']), v(['incremento']), // 2 só incremento
+    v(['categoria', 'economia']), // 1 incremento + categoria
+    v(['categoria']), v(['categoria']), // 2 só categoria
+    v(['titularidade']),
+    v(['tarifa_social']), // outros
+    { grupoStatus: 'oc', grupoRetorno: null, tags: [] },
+  ]);
+  assert.equal(c.inc, 2);
+  assert.equal(c.incCat, 1);
+  assert.equal(c.totalInc, 3); // inc + inc_cat
+  assert.equal(c.totalCat, 3); // cat + inc_cat
+  assert.equal(c.titular, 1);
+  assert.equal(c.outros, 1);
+  assert.equal(c.resultado, 7);
+  assert.equal(c.percorrido, 8);
+});
+
+test('resultado por equipe: todas as equipes do escopo, serviços que trouxeram resultado e quantidade', async () => {
+  const { out } = await carregarFixtures();
+  const r = M().resultadoPorEquipe(out.visitas, ['RIORECIN-001', 'RIORECIN-002', 'RIOVENIN-001', 'RIOVENIN-009']);
+  const eq = (n) => r.find((x) => x.recurso === n);
+  assert.equal(r.length, 4); // inclui a equipe sem nenhuma visita
+  assert.equal(eq('RIOVENIN-009').exec, 0);
+  assert.equal(eq('RIOVENIN-009').resultado, 0);
+  assert.equal(eq('RIOVENIN-009').taxa, null);
+  assert.deepEqual(eq('RIOVENIN-001').tipos.map((t) => [t.id, t.n]).sort(), [['cat', 1], ['titular', 2]].sort());
+  assert.equal(eq('RIOVENIN-001').resultado, 3);
+  assert.equal(eq('RIORECIN-001').resultado, 1);
+  assert.deepEqual(eq('RIORECIN-001').tipos.map((t) => t.rotulo), ['Incremento de economia']);
+  assert.equal(eq('RIORECIN-002').resultado, 2); // incremento (11) e decremento (12)
+  // ordenadas por resultado, da que mais trouxe para a que menos trouxe
+  assert.deepEqual(r.map((x) => x.resultado), [3, 2, 1, 0]);
+  // o que não trouxe resultado não aparece nos serviços
+  assert.ok(eq('RIORECIN-001').tipos.every((t) => t.n > 0));
+});
+
+test('novos alvos usam o histórico completo para saber se a matrícula já foi atendida depois', async () => {
+  const { out } = await carregarFixtures();
+  const modelo = M().criarModeloChance(out.visitas);
+  // só a equipe RIORECIN-002 "enxerga" a matrícula 100000003 (ocorrência da visita 3) ...
+  const dela = out.visitas.filter((v) => v.recurso === 'RIORECIN-002');
+  assert.equal(M().alvosOcorrencia(dela, modelo, 'revisitar').length, 1);
+  // ... mas se, no histórico, outra equipe executou essa matrícula depois, ela deixa de ser alvo
+  const depois = Object.assign({}, out.visitas.find((v) => v.id === '3'), { id: '999', data: '2026-03-20', status: 'Finalizada', grupoStatus: 'exec', recurso: 'OUTRA' });
+  assert.equal(M().alvosOcorrencia(dela, modelo, 'revisitar', out.visitas.concat([depois])).length, 0);
 });
