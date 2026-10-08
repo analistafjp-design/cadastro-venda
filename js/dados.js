@@ -145,7 +145,6 @@
     const R = CV.regras;
     const extrator = CV.projetos.criarExtrator(R);
     const porProjeto = { regra: 0, similar: 0, novo: 0, sem: 0 };
-    const naoReconhecidos = new Map(); // texto de abertura -> n (para a auditoria)
     const visitas = limpas.map((a) => {
       let proj = { nome: R.semProjeto, rotulo: null, origem: 'sem' };
       const textos = { 'Observação': a.obs, 'Parecer De Campo': a.parecer };
@@ -154,10 +153,6 @@
         if (p.origem !== 'sem') { proj = p; break; }
       }
       porProjeto[proj.origem]++;
-      if (proj.origem === 'sem' && a.obs) {
-        const k = a.obs.slice(0, 70);
-        naoReconhecidos.set(k, (naoReconhecidos.get(k) || 0) + 1);
-      }
       const gs = grupoStatus(a.status);
       const acao = gs === 'oc' ? R.motivos[N().chave(a.motivo)] || R.motivoPadrao : null;
       return Object.assign({}, a, {
@@ -169,7 +164,7 @@
         qtdEconRotulo: rotuloQtdEcon(a.qtdEcon),
       });
     });
-    return { visitas, porProjeto, naoReconhecidos, novos: Array.from(extrator.conhecidos.values()) };
+    return { visitas, porProjeto, novos: Array.from(extrator.conhecidos.values()) };
   }
 
   // ---------- resultados ----------

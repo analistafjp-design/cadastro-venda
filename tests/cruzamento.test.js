@@ -17,9 +17,9 @@ test('projetos unificados nas visitas', async () => {
   assert.equal(porId(1).projeto, 'INCREMENTO');
   assert.equal(porId(2).projeto, 'INCREMENTO'); // texto de instrução diferente
   assert.equal(porId(3).projeto, 'VIDA NOVA');
-  assert.equal(porId(4).projeto, 'VERIFICAÇÃO SOCIAL - VENDA'); // grafia quebrada
+  assert.equal(porId(4).projeto, 'VERIFICAE SOCIAL - VENDA'); // nome do projeto, como aparece no texto
   assert.equal(porId(6).projeto, 'RAIO-X');
-  assert.equal(porId(12).projeto, 'SEM PROJETO');
+  assert.equal(porId(12).projeto, CV.regras.semProjeto);
   assert.equal(porId(14).projeto, 'VARREDURA'); // sem a palavra PROJETO
 });
 

@@ -19,14 +19,14 @@ Cruzamento: o retorno é lançado **depois** da visita (mediana de 1 dia), entã
 1. **Aplicação web estática, sem servidor, sem build.** Abre com duplo clique, roda no navegador e os dados nunca saem do computador (as planilhas têm nomes, CPF e endereços). Uma planilha por dia é acrescentada ao que já está guardado (IndexedDB), deduplicando por ID.
 2. **Leitor de .xlsx próprio, sem dependências.** As CDNs não estavam acessíveis e o pacote público `xlsx` no npm está desatualizado e com vulnerabilidades conhecidas. O leitor lê em fluxo, localiza as partes pelos `.rels` (necessário para o export do sistema) e pega só as colunas pedidas, **pelo nome**.
 3. **Regras de negócio em um único arquivo** (`js/regras.js`) e documentadas — janela, projetos, motivos revisitáveis, o que é "resultado".
-4. **Poucos visuais, escolhidos pelo trabalho que fazem:** um gráfico de colunas (volume ou %), uma matriz equipe × base, e tabelas ordenáveis com barras de taxa. A cor azul é usada só para "resultado"; cinza para o resto.
+4. **Poucos visuais, sem números repetidos:** tabelas ordenáveis com barras de taxa e duas matrizes de calor (equipe × data e equipe × base). Sem gráfico: ele repetia os números da tabela. O topo traz só a taxa e o que não está em nenhuma tabela; os totais ficam na linha *Total*.
 5. **"Novos alvos" = listas acionáveis e exportáveis**, não gráficos: revisitar, corrigir endereço, cobrar retorno, parar de insistir, onde atuar.
 
 ## Como se garantiu a ausência de erros
 
 - **Leitor conferido célula a célula** contra openpyxl/pandas nos três arquivos reais (≈ 220 mil células, 0 divergências).
 - **Cruzamento e agregações reimplementados de forma independente em Python** (busca binária, outra lógica) e comparados visita a visita nos dados reais: 9.536 visitas, 0 divergências; 244 grupos de agregação (projeto, equipe, dia), 0 divergências; mesmos contadores de auditoria.
-- **59 testes automatizados** (`npm test`) com planilhas sintéticas, cada cenário de cruzamento com resultado calculado à mão: dois retornos da mesma matrícula, mesmo dia (ocorrência × executada), retorno antes da visita, fora da janela, protocolo no lugar da matrícula, matrícula inválida, frente de serviço, maturação, nome de projeto com encoding quebrado etc.
+- **69 testes automatizados** (`npm test`) com planilhas sintéticas, cada cenário de cruzamento com resultado calculado à mão: dois retornos da mesma matrícula, mesmo dia (ocorrência × executada), retorno antes da visita, fora da janela, protocolo no lugar da matrícula, matrícula inválida, frente de serviço, maturação, nome de projeto com encoding quebrado etc.
 - **A conta fecha na tela**: todo retorno cai em exatamente um balde na Auditoria; resultado + atualização + sem tratativa = com retorno; com retorno + sem retorno = executadas.
 - **Teste no navegador** (Chromium headless, `file://`): carga, recarga com persistência, recarga do mesmo arquivo sem duplicar, arquivo inválido, limpar dados, modo escuro, celular.
 

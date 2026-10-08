@@ -142,7 +142,7 @@
       visitas: c.visitas,
       auditoria: c.auditoria,
       dataReferencia: c.dataReferencia,
-      projetos: { porOrigem: d.porProjeto, naoReconhecidos: d.naoReconhecidos, novos: d.novos },
+      projetos: { porOrigem: d.porProjeto, novos: d.novos },
       retornos,
     };
   }

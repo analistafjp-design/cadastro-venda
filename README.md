@@ -29,8 +29,10 @@ e responde, **separado por data**: *quantas visitas geraram resultado, por equip
 
 ## O que o painel mostra
 
-- **Diário** — evolução por dia/semana/mês (gráfico + tabela com o mesmo número): atividades, executadas, ocorrências, com retorno, **resultado** e **% de resultado**, aberto por tipo de desfecho (incremento, categoria, titularidade, venda...). Dias recentes aparecem como *em maturação* (o backoffice ainda está lançando).
-- **Bases e equipes** — a mesma medida por projeto e por equipe (recurso), com *índice* contra a média, e a matriz **equipe × base** (para separar o efeito da equipe do efeito da base que ela recebeu).
+Cada número aparece em um só lugar: o topo traz a taxa de resultado e o que não está em nenhuma tabela; os totais ficam na linha *Total* das tabelas.
+
+- **Diário** — por dia, semana ou mês: atividades, executadas, ocorrências, com retorno, **resultado** e **% de resultado**, aberto por tipo de desfecho (incremento, categoria, titularidade, venda...). Logo abaixo, o **resultado por equipe em cada data** (cada célula: % de resultado da equipe naquele dia; com poucas visitas, "resultado/executadas"). Datas recentes aparecem como *em maturação* (o backoffice ainda está lançando).
+- **Bases e equipes** — a mesma medida por projeto e por equipe (recurso), com *índice* contra a média, e a matriz **equipe × base** (para separar o efeito da equipe do efeito da base que ela recebeu). A linha **SEM PROJETO (avulsas)** reúne as demandas que não são uma base (pedidos do atendimento, solicitações das próprias equipes); o painel mostra os textos mais comuns e o filtro **Ocultar avulsas** as tira da análise.
 - **Novos alvos** — listas de ação exportáveis em CSV:
   - *Revisitar*: última visita parou em cliente ausente / retornar depois / imóvel fechado, ordenadas pela **chance estimada** (taxa histórica do projeto × nº de economias);
   - *Corrigir endereço*: "endereço não localizado" (ação do backoffice);
@@ -60,7 +62,7 @@ O app é um site estático, sem build. No GitHub: *Settings → Pages → Deploy
 ## Desenvolvimento
 
 ```bash
-npm test                         # 66 testes (Node 18+; sem dependências)
+npm test                         # 69 testes (Node 18+; sem dependências)
 python3 tests/fixtures/gerar.py  # regenera as planilhas sintéticas (requer openpyxl)
 ```
 
@@ -80,7 +82,7 @@ js/
   metricas.js         agregações e listas de novos alvos
   pasta.js            varredura de pasta (handle, arrastar, input) e o que já foi lido
   store.js csv.js     armazenamento local (dados e pasta lembrada) e exportação CSV
-  ui-*.js app.js      interface
+  ui-util.js ui-tabela.js app.js   interface
 tests/                testes automatizados + planilhas sintéticas
 exemplos/             planilhas sintéticas para experimentar
 ```

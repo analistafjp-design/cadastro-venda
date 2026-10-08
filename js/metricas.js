@@ -22,6 +22,7 @@
       if (flt.projetos && flt.projetos.size && !flt.projetos.has(v.projeto)) return false;
       if (flt.recursos && flt.recursos.size && !flt.recursos.has(v.recurso)) return false;
       if (flt.cidades && flt.cidades.size && !flt.cidades.has(v.cidade || '(sem cidade)')) return false;
+      if (flt.semAvulsas && v.projeto === CV.regras.semProjeto) return false;
       return true;
     });
   }
@@ -89,16 +90,80 @@
     return linhas;
   }
 
-  /** Série por dia/semana/mês (por data da VISITA), em ordem cronológica. */
-  function porPeriodo(visitas, granularidade) {
-    const chaveDe = (v) => {
+  function chavePeriodo(granularidade) {
+    return (v) => {
       if (granularidade === 'semana') return N().inicioSemana(v.data);
       if (granularidade === 'mes') return v.data.slice(0, 7);
       return v.data;
     };
-    const linhas = agruparPor(visitas, chaveDe);
+  }
+
+  /** Série por dia/semana/mês (por data da VISITA), em ordem cronológica. */
+  function porPeriodo(visitas, granularidade) {
+    const linhas = agruparPor(visitas, chavePeriodo(granularidade));
     linhas.sort((a, b) => (a.chave < b.chave ? -1 : 1));
     return linhas;
+  }
+
+  /**
+   * Resultado por equipe e por período (dia/semana/mês), pela data da visita.
+   * Colunas do período mais recente para o mais antigo. Só conta visitas executadas.
+   */
+  function matrizPeriodos(visitas, granularidade) {
+    const chaveDe = chavePeriodo(granularidade);
+    const periodos = Array.from(new Set(visitas.map(chaveDe))).sort().reverse();
+    const porEquipe = new Map();
+    const total = { exec: 0, resultado: 0, celulas: new Map() };
+    const somar = (cel, v) => {
+      cel.exec++;
+      if (v.grupoRetorno === 'resultado') cel.resultado++;
+      if (v.maturando) cel.maturando++;
+    };
+    const nova = () => ({ exec: 0, resultado: 0, maturando: 0 });
+    for (const v of visitas) {
+      if (v.grupoStatus !== 'exec') continue;
+      let e = porEquipe.get(v.recurso);
+      if (!e) { e = { recurso: v.recurso, tipo: v.equipe, exec: 0, resultado: 0, celulas: new Map() }; porEquipe.set(v.recurso, e); }
+      const k = chaveDe(v);
+      if (!e.celulas.has(k)) e.celulas.set(k, nova());
+      if (!total.celulas.has(k)) total.celulas.set(k, nova());
+      somar(e.celulas.get(k), v);
+      somar(total.celulas.get(k), v);
+      e.exec++;
+      total.exec++;
+      if (v.grupoRetorno === 'resultado') { e.resultado++; total.resultado++; }
+    }
+    const montar = (e) => ({
+      recurso: e.recurso,
+      tipo: e.tipo,
+      exec: e.exec,
+      resultado: e.resultado,
+      taxa: div(e.resultado, e.exec),
+      celulas: periodos.map((k) => {
+        const c = e.celulas.get(k) || nova();
+        return { chave: k, exec: c.exec, resultado: c.resultado, taxa: div(c.resultado, c.exec), maturando: c.maturando };
+      }),
+    });
+    const linhas = Array.from(porEquipe.values()).map(montar);
+    linhas.sort((a, b) => b.exec - a.exec || a.recurso.localeCompare(b.recurso, 'pt-BR'));
+    return { periodos, linhas, total: montar({ recurso: 'Todas as equipes', tipo: null, exec: total.exec, resultado: total.resultado, celulas: total.celulas }) };
+  }
+
+  /**
+   * O que são as atividades "sem projeto" (demandas avulsas): agrupa pelos 3 primeiros
+   * termos do texto de abertura, com um exemplo de cada grupo.
+   */
+  function textosAvulsas(visitas, limite) {
+    const grupos = new Map();
+    for (const v of visitas) {
+      if (v.projeto !== CV.regras.semProjeto) continue;
+      const bruto = v.obs || '(sem texto de abertura)';
+      const k = N().chave(bruto).split(' ').slice(0, 3).join(' ') || '(sem texto de abertura)';
+      let g = grupos.get(k);
+      if (!g) { g = { chave: k, n: 0, exemplo: bruto.slice(0, 110) }; grupos.set(k, g); }
+      g.n++;
+    }
+    return Array.from(grupos.values()).sort((a, b) => b.n - a.n).slice(0, limite || 8);
   }
 
   /** Matriz equipe × projeto: taxa de resultado e volume de cada célula. */
@@ -262,7 +327,7 @@
   }
 
   CV.metricas = {
-    filtrar, resumo, agruparPor, porPeriodo, matriz, criarModeloChance,
+    filtrar, resumo, agruparPor, porPeriodo, matrizPeriodos, textosAvulsas, matriz, criarModeloChance,
     alvosOcorrencia, alvosSemRetorno, alvosEsgotados, territorios,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = CV.metricas;

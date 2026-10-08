@@ -23,10 +23,9 @@
     datas: { min: null, max: null },
     opcoes: { projetos: [], recursos: [], cidades: [] },
     tipoRecurso: new Map(),
-    filtros: { preset: '30', de: null, ate: null, projetos: new Set(), recursos: new Set(), cidades: new Set() },
+    filtros: { preset: '30', de: null, ate: null, projetos: new Set(), recursos: new Set(), cidades: new Set(), semAvulsas: false },
     gran: 'dia',
     granManual: false,
-    modoGrafico: 'volume',
     aba: 'diario',
     subBases: 'projetos',
     subAlvos: 'revisitar',
@@ -456,7 +455,10 @@
 
     multis = [criarMulti('Projeto', 'projetos'), criarMulti('Equipe', 'recursos'), criarMulti('Cidade', 'cidades')];
     alvo.appendChild(h('div', { class: 'grupo-filtro' }, h('span', { class: 'rotulo-filtro', text: 'Visitas em' }), seg, inDe, h('span', { text: 'a' }), inAte));
-    alvo.appendChild(h('div', { class: 'grupo-filtro' }, multis.map((m) => m.el)));
+    const cbAvulsas = h('input', { type: 'checkbox', checked: f.semAvulsas });
+    cbAvulsas.addEventListener('change', () => { f.semAvulsas = cbAvulsas.checked; delete estado._vs; renderConteudo(); });
+    alvo.appendChild(h('div', { class: 'grupo-filtro' }, multis.map((m) => m.el),
+      h('label', { class: 'check', title: 'Esconde as atividades que não pertencem a nenhum projeto (pedidos do atendimento, solicitações das próprias equipes...)' }, cbAvulsas, 'Ocultar avulsas')));
   }
 
   document.addEventListener('click', (e) => {
@@ -476,9 +478,8 @@
       $('sub-topo').textContent = estado.resultados.size ? 'Faltam as atividades (planilha de Atividades/Cadastral) para cruzar.' : 'Nenhum dado carregado';
       return;
     }
-    const nr = estado.resultados.size;
-    $('sub-topo').textContent = `${fmt.int(estado.atividades.size)} atividades · ${fmt.int(nr)} retornos · visitas de ${fmt.longa(estado.datas.min)} a ${fmt.longa(estado.datas.max)}` +
-      (estado.cruzado.dataReferencia ? ` · último retorno em ${fmt.longa(estado.cruzado.dataReferencia)}` : '') +
+    $('sub-topo').textContent = `visitas de ${fmt.longa(estado.datas.min)} a ${fmt.longa(estado.datas.max)}` +
+      (estado.cruzado.dataReferencia ? ` · último retorno do backoffice em ${fmt.longa(estado.cruzado.dataReferencia)}` : '') +
       (estado.pasta && estado.pasta.ultima ? ` · pasta “${estado.pasta.nome}” lida em ${new Date(estado.pasta.ultima).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}` : '');
     $('sub-topo').title = $('sub-topo').textContent;
     renderConteudo();
@@ -492,25 +493,20 @@
   }
 
   function renderResumo() {
-    const vs = visitasFiltradas();
-    const r = M.resumo(vs);
+    const r = M.resumo(visitasFiltradas());
     const alvo = $('resumo');
     alvo.textContent = '';
-    const num = (valor, rotulo, extra) => h('div', { class: 'num' }, h('div', { class: 'valor', text: valor }), h('div', { class: 'rotulo' }, rotulo, extra ? [' ', h('b', { text: extra })] : null));
+    // Os totais (atividades, executadas, resultado...) ficam só na linha "Total" das tabelas.
+    // Aqui entram a taxa e apenas o que não aparece em nenhuma tabela.
     alvo.appendChild(h('div', { class: 'heroi' },
       h('div', { class: 'rotulo', text: 'Taxa de resultado' }),
       h('div', { class: 'valor', text: fmt.pct(r.taxaResultado) }),
-      h('div', { class: 'sub', text: `${fmt.int(r.resultado)} de ${fmt.int(r.exec)} visitas executadas geraram resultado` })
+      h('div', { class: 'sub', text: 'das visitas executadas geraram resultado' })
     ));
-    alvo.appendChild(h('div', { class: 'numeros' },
-      num(fmt.int(r.total), 'atividades (alvos)', r.matriculas ? fmt.int(r.matriculas) + ' matrículas' : null),
-      num(fmt.int(r.exec), 'executadas', fmt.pct(r.taxaExec) + ' das atividades'),
-      num(fmt.int(r.oc), 'ocorrências', 'visita sem execução'),
-      num(fmt.pct(r.taxaRetorno), 'com retorno do backoffice', fmt.int(r.comRetorno) + ' de ' + fmt.int(r.exec)),
-      num(fmt.int(r.atualizacao), 'só atualização cadastral', r.exec ? fmt.pct(r.atualizacao / r.exec) : null),
-      num(fmt.int(r.semRetorno), 'sem retorno ainda', r.maturando ? fmt.int(r.maturando) + ' em maturação' : null),
-      num(fmt.sinal(r.deltaEcon), 'economias (líquido)', 'DE/PARA dos incrementos')
-    ));
+    const num = (valor, rotulo) => h('div', { class: 'num' }, h('div', { class: 'valor', text: valor }), h('div', { class: 'rotulo', text: rotulo }));
+    const itens = [num(fmt.int(r.matriculas), 'matrículas distintas visitadas')];
+    if (r.maturando) itens.push(num(fmt.int(r.maturando), 'visitas recentes ainda em maturação'));
+    alvo.appendChild(h('div', { class: 'numeros' }, itens));
   }
 
   const ABAS = [['diario', 'Diário'], ['bases', 'Bases e equipes'], ['alvos', 'Novos alvos'], ['auditoria', 'Auditoria']];
@@ -559,38 +555,41 @@
 
   // ---- Diário
 
+  const MIN_CEL = 5; // células com menos executadas mostram "resultado/executadas" em vez do %
+
+  /**
+   * Célula de matriz sem repetir número: com amostra suficiente mostra só o % (cor = intensidade);
+   * com amostra pequena mostra só "resultado/executadas", sem cor. O detalhe fica no tooltip.
+   */
+  function celulaCalor(c, maxTaxa, titulo) {
+    const suficiente = c.exec >= MIN_CEL;
+    let cls = 'm0';
+    if (suficiente && maxTaxa) {
+      const q = c.taxa / maxTaxa;
+      cls = q > 0.8 ? 'm5' : q > 0.6 ? 'm4' : q > 0.4 ? 'm3' : q > 0.2 ? 'm2' : 'm1';
+    }
+    return h('td', { class: 'cel ' + cls, title: titulo }, !c.exec ? '·' : suficiente ? fmt.pct(c.taxa) : c.resultado + '/' + c.exec);
+  }
+
+  function legendaCalor(texto) {
+    return h('div', { class: 'legenda', style: { marginTop: '10px' } },
+      ['m1', 'm2', 'm3', 'm4', 'm5'].map((c, i) => h('span', null, h('i', { class: c, style: { width: '18px' } }), ['menor', '', '', '', 'maior taxa'][i])),
+      h('span', { text: texto })
+    );
+  }
+
   function renderDiario(alvo) {
     const vs = visitasFiltradas();
     const gran = granularidadeAtual();
     const linhas = M.porPeriodo(vs, gran);
     const geral = M.resumo(vs);
+    const nomeGran = gran === 'dia' ? 'dia' : gran === 'semana' ? 'semana' : 'mês';
 
     alvo.appendChild(h('div', { class: 'cabeca' },
-      h('h2', { text: gran === 'dia' ? 'Evolução por dia' : gran === 'semana' ? 'Evolução por semana' : 'Evolução por mês' }),
+      h('h2', { text: 'Resultado por ' + nomeGran }),
       segmentado([['dia', 'Dia'], ['semana', 'Semana'], ['mes', 'Mês']], gran, (g) => { estado.gran = g; estado.granManual = true; renderPainel(); }, 'Agrupar por'),
-      segmentado([['volume', 'Volume'], ['taxa', '% Resultado']], estado.modoGrafico, (m) => { estado.modoGrafico = m; renderPainel(); }, 'Medida'),
       h('span', { class: 'espaco' })
     ));
-
-    if (estado.modoGrafico === 'volume') {
-      alvo.appendChild(h('div', { class: 'legenda' },
-        h('span', null, h('i', { style: { background: 'var(--serie-1)' } }), 'Executadas com resultado'),
-        h('span', null, h('i', { style: { background: 'var(--serie-2)' } }), 'Demais executadas')
-      ));
-    }
-    const area = h('div', { class: 'grafico' });
-    alvo.appendChild(area);
-    const desenhar = () => CV.ui.desenharGrafico(area, linhas, { modo: estado.modoGrafico, gran, mediaTaxa: geral.taxaResultado });
-    requestAnimationFrame(desenhar);
-    if (window.ResizeObserver) {
-      let ultimo = 0;
-      const ro = new ResizeObserver(() => {
-        if (!area.isConnected) { ro.disconnect(); return; }
-        const w = area.clientWidth;
-        if (Math.abs(w - ultimo) > 4) { ultimo = w; desenhar(); }
-      });
-      ro.observe(area);
-    }
 
     const rotulo = (l) => {
       if (gran === 'mes') return fmt.mes(l.chave + '-01');
@@ -604,14 +603,54 @@
       csv: (l) => (gran === 'dia' ? fmt.longa(l.chave) : rotulo(l)),
     };
     const cols = CV.ui.colunasResumo(primeira, linhas.concat([geral]), geral);
-    const tab = CV.ui.criarTabela({
+    alvo.appendChild(CV.ui.criarTabela({
       colunas: cols, linhas, total: Object.assign({ chave: 'Total do período', ehTotal: true }, geral),
       ordem: ordemDe('diario-' + gran, { id: 'periodo', dir: 'desc' }),
-    });
-    alvo.appendChild(tab);
-    alvo.appendChild(h('p', { class: 'nota', text: 'As visitas são contadas pela data em que aconteceram; o resultado volta para a data da visita que o originou (cruzamento pela matrícula). Dias recentes ficam "em maturação" porque o backoffice leva em média 1 a 3 dias para lançar o retorno.' }));
-    alvo.appendChild(h('div', { class: 'cabeca' }, h('span', { class: 'espaco' }),
+    }));
+    alvo.appendChild(h('div', { class: 'cabeca', style: { marginTop: '10px' } },
+      h('p', { class: 'nota', style: { margin: 0, flex: 1 }, text: 'Cada visita é contada na data em que aconteceu, e o resultado volta para a data da visita que o originou (cruzamento pela matrícula). Datas recentes ficam "em maturação": o backoffice leva de 1 a 3 dias para lançar o retorno.' }),
       h('button', { class: 'btn mini', text: 'Exportar esta tabela (CSV)', on: { click: () => exportarTabela('acompanhamento-' + gran + '.csv', cols, linhas) } })));
+
+    // ---- resultado por equipe, em cada período (colunas: do mais recente ao mais antigo)
+    const mx = M.matrizPeriodos(vs, gran);
+    alvo.appendChild(h('h3', { text: 'Resultado por equipe, em cada ' + nomeGran }));
+    if (!mx.linhas.length) {
+      alvo.appendChild(h('p', { class: 'nota', text: 'Nenhuma visita executada no período selecionado.' }));
+      return;
+    }
+    let maxTaxa = 0;
+    for (const l of mx.linhas) for (const c of l.celulas) if (c.exec >= MIN_CEL && c.taxa > maxTaxa) maxTaxa = c.taxa;
+    const maturando = new Set();
+    for (const l of mx.linhas) for (const c of l.celulas) if (c.maturando > 0) maturando.add(c.chave);
+    const cab = (k) => {
+      const partes = gran === 'mes' ? [fmt.mes(k + '-01')] : [gran === 'dia' ? N.diaDaSemana(k) : 'sem.', fmt.curta(k)];
+      return h('th', { class: 'sem-ordem', title: gran === 'semana' ? 'Semana de ' + fmt.longa(k) : fmt.longa(k) + (maturando.has(k) ? ' — em maturação' : '') },
+        partes.map((t, i) => [i ? h('br') : null, t]), maturando.has(k) ? h('span', { class: 'mat-marca', text: '*' }) : null);
+    };
+    const tabela = h('table', { class: 'tab matriz' },
+      h('thead', null, h('tr', null, h('th', { class: 'txt sem-ordem', text: 'Equipe' }), mx.periodos.map(cab))),
+      h('tbody', null, mx.linhas.map((l) => h('tr', null,
+        h('td', { class: 'txt' }, l.recurso, l.tipo ? h('span', { class: 'etiqueta', text: l.tipo }) : null),
+        l.celulas.map((c) => celulaCalor(c, maxTaxa, c.exec ? l.recurso + ' · ' + (gran === 'mes' ? fmt.mes(c.chave + '-01') : fmt.longa(c.chave)) + ': ' + c.resultado + ' de ' + c.exec + ' executadas (' + fmt.pct(c.taxa) + ')' : 'sem visitas executadas')))))
+    );
+    alvo.appendChild(h('div', { class: 'tabela-wrap' }, tabela));
+    alvo.appendChild(legendaCalor('Cada célula: % de resultado sobre as visitas executadas da equipe naquele ' + nomeGran + '. Com menos de ' + MIN_CEL + ' executadas aparece "resultado/executadas", sem cor.'));
+    alvo.appendChild(h('div', { class: 'cabeca', style: { marginTop: '10px' } }, h('span', { class: 'espaco' }),
+      maturando.size ? h('span', { class: 'nota', style: { margin: 0 }, text: '* em maturação' }) : null,
+      h('button', { class: 'btn mini', text: 'Exportar equipe × ' + nomeGran + ' (CSV)', on: { click: () => exportarEquipePeriodo(mx, gran) } })));
+  }
+
+  function exportarEquipePeriodo(mx, gran) {
+    const linhas = [];
+    for (const l of mx.linhas) for (const c of l.celulas) if (c.exec) linhas.push({ equipe: l.recurso, tipo: l.tipo, chave: c.chave, exec: c.exec, resultado: c.resultado, taxa: c.taxa });
+    CV.csv.baixar('resultado-por-equipe-' + gran + '.csv', [
+      { titulo: 'Equipe', valor: (x) => x.equipe },
+      { titulo: 'Tipo', valor: (x) => x.tipo || '' },
+      { titulo: gran === 'mes' ? 'Mês' : gran === 'semana' ? 'Semana (início)' : 'Data da visita', valor: (x) => (gran === 'mes' ? fmt.mes(x.chave + '-01') : fmt.longa(x.chave)) },
+      { titulo: 'Executadas', valor: (x) => x.exec },
+      { titulo: 'Com resultado', valor: (x) => x.resultado },
+      { titulo: '% Resultado', valor: (x) => Math.round(x.taxa * 1000) / 10 },
+    ], linhas);
   }
 
   // ---- Bases e equipes
@@ -642,6 +681,15 @@
       ordem: ordemDe('bases-' + estado.subBases, { id: 'exec', dir: 'desc' }),
       classeLinha: (l) => (l.exec < R.minAmostra ? 'pequena' : ''),
     }));
+    if (!porEquipe && linhas.some((l) => l.chave === R.semProjeto)) {
+      const tops = M.textosAvulsas(vs, 6);
+      alvo.appendChild(h('div', { class: 'explica' },
+        h('b', { text: '“' + R.semProjeto + '”' }),
+        ' são atividades cujo texto de abertura não começa com o nome de um projeto: em geral pedidos do atendimento (call center, WhatsApp), solicitações das próprias equipes e instruções avulsas — não são uma base de alvos gerada. Os textos mais comuns:',
+        h('ul', { class: 'lista-simples' }, tops.map((t) => h('li', null, h('code', { text: t.exemplo }), ' — ' + fmt.int(t.n)))),
+        'Use “Ocultar avulsas” na barra de filtros para analisar só as bases. Se algum desses textos for, na verdade, uma base de alvos, cadastre o nome na lista ',
+        h('code', { text: 'projetos' }), ' de ', h('code', { text: 'js/regras.js' }), '.'));
+    }
     alvo.appendChild(h('p', { class: 'nota', text: 'Índice compara a taxa de resultado da linha com a média do recorte (▲ ≥ 1,25× e ▼ ≤ 0,6×); só é calculado com ' + R.minAmostra + '+ visitas executadas. As colunas de desfecho não somam o total: uma visita pode ter mais de um desfecho (ex.: titularidade + débitos).' }));
     alvo.appendChild(h('div', { class: 'cabeca' }, h('span', { class: 'espaco' }),
       h('button', { class: 'btn mini', text: 'Exportar esta tabela (CSV)', on: { click: () => exportarTabela(porEquipe ? 'efetividade-equipes.csv' : 'efetividade-bases.csv', cols, linhas) } })));
@@ -657,26 +705,16 @@
     const projetos = cnt('projeto').slice(0, 10);
     const recursos = cnt('recurso');
     const matriz = M.matriz(vs, projetos, recursos);
-    const MIN = 5;
     let maxTaxa = 0;
-    for (const l of matriz) for (const c of l.celulas) if (c.exec >= MIN && c.taxa > maxTaxa) maxTaxa = c.taxa;
-    const classe = (c) => {
-      if (c.exec < MIN || !maxTaxa) return 'm0';
-      const q = c.taxa / maxTaxa;
-      return q > 0.8 ? 'm5' : q > 0.6 ? 'm4' : q > 0.4 ? 'm3' : q > 0.2 ? 'm2' : 'm1';
-    };
+    for (const l of matriz) for (const c of l.celulas) if (c.exec >= MIN_CEL && c.taxa > maxTaxa) maxTaxa = c.taxa;
     const tabela = h('table', { class: 'tab matriz' },
       h('thead', null, h('tr', null, h('th', { class: 'txt sem-ordem', text: 'Equipe' }), projetos.map((p) => h('th', { class: 'sem-ordem', title: p, text: p })))),
       h('tbody', null, matriz.map((l) => h('tr', null,
         h('td', { class: 'txt', text: l.recurso }),
-        l.celulas.map((c) => h('td', { class: 'cel ' + classe(c), title: c.exec ? `${l.recurso} · ${c.projeto}: ${c.resultado} de ${c.exec} (${fmt.pct(c.taxa)})` : 'sem visitas executadas' },
-          c.exec ? [fmt.pct(c.taxa), h('small', { text: c.resultado + '/' + c.exec })] : '·')))))
+        l.celulas.map((c) => celulaCalor(c, maxTaxa, c.exec ? `${l.recurso} · ${c.projeto}: ${c.resultado} de ${c.exec} executadas (${fmt.pct(c.taxa)})` : 'sem visitas executadas')))))
     );
     alvo.appendChild(h('div', { class: 'tabela-wrap' }, tabela));
-    alvo.appendChild(h('div', { class: 'legenda', style: { marginTop: '10px' } },
-      ['m1', 'm2', 'm3', 'm4', 'm5'].map((c, i) => h('span', null, h('i', { class: c, style: { width: '18px' } }), ['menor', '', '', '', 'maior taxa'][i])),
-      h('span', { text: 'Cada célula: % de resultado e resultados/executadas. Sem cor: menos de ' + MIN + ' executadas.' })
-    ));
+    alvo.appendChild(legendaCalor('Cada célula: % de resultado sobre as visitas executadas. Com menos de ' + MIN_CEL + ' executadas aparece "resultado/executadas", sem cor.'));
     alvo.appendChild(h('p', { class: 'nota', text: 'Mostra as 10 bases com mais visitas executadas no recorte. Use para ver se a diferença entre equipes vem da equipe ou da base que ela recebeu.' }));
   }
 
@@ -711,7 +749,7 @@
       alvo.appendChild(h('p', { class: 'nota', style: { margin: '0 0 10px' }, text: descricao }));
       alvo.appendChild(CV.ui.criarTabela({ colunas: cols, linhas, ordem: ordemDe(ordemId, { id: null, dir: 'desc' }), maxLinhas: 300, vazio: 'Nenhum alvo nesta lista com os filtros atuais.' }));
       alvo.appendChild(h('div', { class: 'cabeca', style: { marginTop: '10px' } },
-        h('span', { class: 'nota', style: { margin: 0 }, text: linhas.length > 300 ? 'Mostrando 300 de ' + fmt.int(linhas.length) + ' — exporte para ver todos.' : fmt.int(linhas.length) + ' alvo(s).' }),
+        h('span', { class: 'nota', style: { margin: 0 }, text: linhas.length > 300 ? 'Mostrando os 300 primeiros — exporte para ver todos.' : '' }),
         h('span', { class: 'espaco' }),
         h('button', { class: 'btn mini primario', text: 'Exportar lista (CSV)', disabled: !linhas.length, on: { click: () => exportarTabela(nomeCsv, cols, linhas) } })));
     };
@@ -799,7 +837,7 @@
       segmentado(Object.entries(DIMENSOES).map(([id, [nome]]) => [id, nome]), estado.dimTerr, (d) => { estado.dimTerr = d; renderPainel(); }),
       h('span', { class: 'espaco' })
     ));
-    alvo.appendChild(h('p', { class: 'nota', style: { margin: '0 0 10px' }, text: `Onde a taxa de resultado é maior ou menor que a média do recorte (${fmt.pct(t.geral.taxaResultado)}). Só entram grupos com ${R.minAmostraRanking}+ visitas executadas. "Priorizar": gerar mais alvos com esse perfil/território. "Rever": a base está rendendo bem abaixo da média.` }));
+    alvo.appendChild(h('p', { class: 'nota', style: { margin: '0 0 10px' }, text: `Onde a taxa de resultado é maior ou menor que a média do recorte. Só entram grupos com ${R.minAmostraRanking}+ visitas executadas. "Priorizar": gerar mais alvos com esse perfil/território. "Rever": a base está rendendo bem abaixo da média.` }));
     const leitura = (l) => (l.indice >= 1.3 ? 'alta' : l.indice <= 0.5 ? 'baixa' : '');
     const cols = [
       colTxt('dim', nomeDim, (l) => l.chave),
@@ -855,33 +893,28 @@
 
     alvo.appendChild(h('h3', { text: 'Atividades (alvos)' }));
     const proj = c.projetos;
-    alvo.appendChild(kv([
+    const semZero = (pares) => pares.filter(([, v], i) => i === 0 || v > 0); // 1ª linha é o total; as demais só se houver
+    alvo.appendChild(kv(semZero([
       ['Atividades carregadas', fmt.int(at)],
-      ['Sem matrícula válida (não cruzam)', fmt.int(a.visitasSemMatricula)],
-      ['Projeto reconhecido pelas regras', fmt.int(proj.porOrigem.regra)],
-      ['Projeto unido por semelhança de escrita', fmt.int(proj.porOrigem.similar)],
-      ['Projeto novo (sem regra cadastrada)', fmt.int(proj.porOrigem.novo)],
-      ['Sem projeto identificável', fmt.int(proj.porOrigem.sem)],
-    ]));
-    if (proj.naoReconhecidos.size) {
-      alvo.appendChild(h('p', { class: 'nota', text: 'Textos de abertura sem projeto (os mais frequentes). Se algum for uma base de verdade, cadastre o nome em js/regras.js:' }));
-      const top = Array.from(proj.naoReconhecidos.entries()).sort((x, y) => y[1] - x[1]).slice(0, 8);
-      alvo.appendChild(h('ul', { class: 'lista-simples' }, top.map(([t, n]) => h('li', null, h('code', { text: t }), ' — ' + fmt.int(n)))));
-    }
+      ['Sem matrícula válida (não cruzam)', a.visitasSemMatricula],
+      ['Projeto unido por semelhança de escrita', proj.porOrigem.similar],
+      ['Projeto novo (sem regra cadastrada)', proj.porOrigem.novo],
+      ['Demandas avulsas (sem projeto)', proj.porOrigem.sem],
+    ]).map(([k, v]) => [k, typeof v === 'number' ? fmt.int(v) : v])));
     const novos = proj.novos.filter((n) => !R.projetos.some((p) => p[1] === n));
     if (novos.length) alvo.appendChild(h('p', { class: 'nota', text: 'Projetos novos detectados (ainda sem regra): ' + novos.join(', ') + '.' }));
 
     alvo.appendChild(h('h3', { text: 'Retornos do backoffice (planilha de Resultados)' }));
-    alvo.appendChild(kv([
-      ['Retornos carregados', fmt.int(a.retornosTotal)],
-      ['Atribuídos a uma visita', fmt.int(a.atribuidos)],
-      ['Matrícula fora das bases visitadas', fmt.int(a.foraDasBases)],
-      ['Anteriores à primeira visita da matrícula', fmt.int(a.anteriorVisita)],
-      ['Depois da janela de ' + estado.janela + ' dias', fmt.int(a.foraJanela)],
-      ['Matrícula inválida (não é 9 dígitos)', fmt.int(a.matriculaInvalida)],
-      ['Resgatados pelo número do protocolo', fmt.int(a.resgatadosProtocolo)],
-      ['Frente de serviço desconsiderada', fmt.int(a.frenteIgnorada)],
-    ]));
+    alvo.appendChild(kv(semZero([
+      ['Retornos carregados', a.retornosTotal],
+      ['Atribuídos a uma visita', a.atribuidos],
+      ['Matrícula fora das bases visitadas', a.foraDasBases],
+      ['Anteriores à primeira visita da matrícula', a.anteriorVisita],
+      ['Depois da janela de ' + estado.janela + ' dias', a.foraJanela],
+      ['Matrícula inválida (não é 9 dígitos)', a.matriculaInvalida],
+      ['Resgatados pelo número do protocolo', a.resgatadosProtocolo],
+      ['Frente de serviço desconsiderada', a.frenteIgnorada],
+    ]).map(([k, v]) => [k, typeof v === 'number' ? fmt.int(v) : v])));
     alvo.appendChild(h('p', { class: 'nota', text: 'Os retornos "fora das bases" são trabalho do backoffice sobre matrículas que não vieram destas bases de visita (demanda interna, outras regiões); por isso não entram na efetividade.' }));
 
     alvo.appendChild(h('h3', { text: 'Arquivos carregados' }));

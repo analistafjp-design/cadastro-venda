@@ -128,8 +128,9 @@
     if (o.indice) {
       cols.push({
         id: 'ind', titulo: 'Índice', tipo: 'num', dica: 'Taxa de resultado ÷ taxa geral do período (2,0× = converte o dobro da média)',
-        valor: (l) => (l.exec >= R.minAmostra && geral.taxaResultado ? l.taxaResultado / geral.taxaResultado : null),
+        valor: (l) => (!l.ehTotal && l.exec >= R.minAmostra && geral.taxaResultado ? l.taxaResultado / geral.taxaResultado : null),
         render: (l) => {
+          if (l.ehTotal) return ''; // o total é a própria média: índice sempre 1,0×
           const v = l.exec >= R.minAmostra && geral.taxaResultado ? l.taxaResultado / geral.taxaResultado : null;
           if (v === null) return '–';
           return h('span', { class: 'indice ' + (v >= 1.25 ? 'alto' : v <= 0.6 ? 'baixo' : ''), text: (v >= 1.25 ? '▲ ' : v <= 0.6 ? '▼ ' : '') + fmt.ind(v) });
