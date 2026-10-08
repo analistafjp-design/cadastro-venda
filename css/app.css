@@ -14,8 +14,6 @@
   --accent: #256abf;
   --accent-ink: #ffffff;
   --accent-wash: #e8f1fd;
-  --serie-1: #2a78d6;      /* com resultado */
-  --serie-2: #cfcec8;      /* demais executadas */
   --barra-tabela: #cde2fb; /* preenchimento da barra de taxa nas tabelas */
   --good: #006300;         /* texto de status positivo */
   --warn: #8a5a00;
@@ -40,8 +38,6 @@
     --accent: #3987e5;
     --accent-ink: #0b0b0b;
     --accent-wash: #16273b;
-    --serie-1: #3987e5;
-    --serie-2: #55554f;
     --barra-tabela: #184f95;
     --good: #5bd05b;
     --warn: #f0b84a;
@@ -62,8 +58,6 @@
   --accent: #3987e5;
   --accent-ink: #0b0b0b;
   --accent-wash: #16273b;
-  --serie-1: #3987e5;
-  --serie-2: #55554f;
   --barra-tabela: #184f95;
   --good: #5bd05b;
   --warn: #f0b84a;
@@ -200,28 +194,9 @@ details.multi.ativo > summary { background: var(--accent-wash); border-color: va
 .painel .nota { color: var(--ink-3); font-size: 12.5px; margin: 8px 0 0; max-width: 980px; }
 .painel .espaco { flex: 1; }
 
-/* ---------- gráfico ---------- */
-.grafico { position: relative; margin-bottom: 14px; }
-.grafico svg { display: block; width: 100%; height: auto; overflow: visible; }
-.grafico .eixo text { fill: var(--ink-3); font-size: 11px; }
-.grafico .grade line { stroke: var(--line); stroke-width: 1; }
-.grafico .coluna { cursor: default; }
-.grafico .alvo { fill: transparent; }
-.grafico .alvo:hover, .grafico .alvo.foco { fill: color-mix(in srgb, var(--ink) 6%, transparent); }
-.grafico .ref line { stroke: var(--ink-3); stroke-width: 1; }
-.grafico .ref text { fill: var(--ink-2); font-size: 11px; }
+/* ---------- legenda das matrizes ---------- */
 .legenda { display: flex; gap: 16px; flex-wrap: wrap; color: var(--ink-2); font-size: 12.5px; margin-bottom: 6px; }
 .legenda i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
-.dica {
-  position: absolute; z-index: 10; pointer-events: none; background: var(--surface); border: 1px solid var(--line-2);
-  border-radius: 8px; box-shadow: var(--shadow); padding: 8px 10px; min-width: 190px; font-size: 12.5px;
-}
-.dica .t { font-weight: 650; margin-bottom: 4px; }
-.dica .l { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
-.dica .l b { font-size: 14px; }
-.dica .l span { color: var(--ink-2); display: inline-flex; align-items: center; gap: 6px; }
-.dica .l span i { display: inline-block; width: 12px; height: 3px; border-radius: 2px; }
-.dica .m { color: var(--ink-3); margin-top: 4px; }
 
 /* ---------- tabelas ---------- */
 .tabela-wrap { overflow: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); max-height: 70vh; }
@@ -308,3 +283,8 @@ code { font-family: var(--mono); font-size: 12px; background: var(--surface-2); 
   .filtros, .topo .acoes, .abas { display: none; }
   .tabela-wrap { max-height: none; overflow: visible; }
 }
+
+.mat-marca { color: var(--ink-3); font-weight: 400; }
+label.check { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-2); cursor: pointer; white-space: nowrap; padding: 4px 6px; }
+.explica { margin: 12px 0 0; padding: 10px 14px; border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 8px; background: var(--surface); color: var(--ink-2); font-size: 13px; max-width: 980px; }
+.explica ul { margin: 6px 0 8px; }

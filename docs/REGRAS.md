@@ -60,14 +60,19 @@ Unificações já feitas (variações do mesmo projeto → um só):
 | INCREMENTO | `INCREMENTO` com qualquer das instruções de texto |
 | VARREDURA | `VARREDURA`, `VARREDURA - INCREMENTO`, `VAR`, `LNA - VARREDURA` |
 | VENDA LNA | `VENDA LNA`, `VENDA` |
-| VERIFICAÇÃO SOCIAL - VENDA | `VERIFICAE SOCIAL - VENDA` (grafia quebrada) |
-| VERIFICAÇÃO - PÚBLICO | `VERIFICAE - PUBLICO` |
+| VERIFICAE SOCIAL - VENDA | `VERIFICAE SOCIAL - VENDA`, `VERIFICACAO SOCIAL` |
+| VERIFICAE - PÚBLICO | `VERIFICAE - PUBLICO` |
 | DESMEMBRAMENTO | `DESMEMBRAMENTO`, `SEPARACAO DE ECONOMIAS` |
 | EDIFÍCIOS | `EDIFICIOS-METROPOLITANA`, `INCREMENTO EDIFICIOS` |
-| NEGOCIAÇÃO | `NEGOCIAE-PRIORIDADE 2`, `-PRIORIDADE 3` |
+| NEGOCIAE | `NEGOCIAE-PRIORIDADE 2`, `-PRIORIDADE 3` |
 | RAIO-X | `RAIO - X`, `raio - x` |
 | FATURA DIGITAL - RECADASTRO | `FATURA DIGITAL - RECADASTRO` |
-| SAÚDE PÚBLICA, CARTÃO VERMELHO SOCIAL, FERIADÃO, ATUALIZAÇÃO CONDOMÍNIOS, VENDA LOCALIZAÇÃO | grafias com `¿` ou cortadas |
+| ATUALIZAE CONDOMÍNIOS, LOCALIZAE, VENDA LOCALIZAE | `ATUALIZAE CONDOMINIOS`, `LOCALIZAE:`, `VENDA LOCALIZAE` |
+| SAÚDE PÚBLICA, CARTÃO VERMELHO SOCIAL, FERIADÃO | grafias com `¿` (acento perdido) |
+
+**Nomes terminados em "AE"** (`LOCALIZAE`, `VERIFICAE`, `ATUALIZAE`, `NEGOCIAE`) são os nomes dos projetos e aparecem assim no texto de abertura; acento realmente perdido aparece como `¿` (`SA¿E`, `CART¿`). Por isso os primeiros são mantidos como estão.
+
+**SEM PROJETO (avulsas).** Atividades cujo texto de abertura não começa com o nome de um projeto: pedidos do atendimento (call center, WhatsApp), solicitações das próprias equipes (`SOLICITADO PELA EQUIPE ...`), instruções genéricas e atividades sem texto. Não são uma base de alvos gerada; entram nas contas de equipe e de dia, e o filtro *Ocultar avulsas* as retira.
 
 Se discordar de alguma união (por exemplo, separar `VARREDURA - INCREMENTO` de `VARREDURA`), edite a lista `projetos`.
 

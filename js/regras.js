@@ -39,28 +39,33 @@
      */
     colunasProjeto: ['Observação', 'Parecer De Campo'],
 
-    /** Nome usado quando não há projeto identificável. */
-    semProjeto: 'SEM PROJETO',
+    /**
+     * Nome usado quando não há projeto identificável: demandas avulsas (pedidos do
+     * atendimento/call center, solicitações das próprias equipes, instruções genéricas).
+     */
+    semProjeto: 'SEM PROJETO (avulsas)',
 
     /**
      * Unificação de nomes de projeto. Cada item: [regex aplicada à chave do
      * rótulo (maiúsculas, sem acento), nome final]. A primeira que casar vence.
      * Variações de escrita do mesmo projeto caem no mesmo nome.
+     * Atenção: nomes como LOCALIZAE, VERIFICAE, ATUALIZAE e NEGOCIAE são os nomes
+     * reais dos projetos (terminam em "ê"); acento realmente perdido aparece como "¿".
      */
     projetos: [
       ['^INCREMENTO EDIFIC', 'EDIFÍCIOS'],
       ['^INCREMENTO', 'INCREMENTO'],
       ['^VARREDURA|^VAR$|^LNA VARREDURA', 'VARREDURA'],
       ['^VENDA LNA$|^VENDA$', 'VENDA LNA'],
-      ['^VENDA LOCALIZ', 'VENDA LOCALIZAÇÃO'],
-      ['^VERIFICA\\w* SOCIAL', 'VERIFICAÇÃO SOCIAL - VENDA'],
-      ['^VERIFICA\\w* PUBLICO', 'VERIFICAÇÃO - PÚBLICO'],
+      ['^VENDA LOCALIZ', 'VENDA LOCALIZAE'],
+      ['^VERIFICA\\w* SOCIAL', 'VERIFICAE SOCIAL - VENDA'],
+      ['^VERIFICA\\w* PUBLICO', 'VERIFICAE - PÚBLICO'],
       ['^VERIFICACAO$', 'VERIFICAÇÃO'],
       ['^DESMEMBRAMENTO|^SEPARACAO DE ECONOMIA', 'DESMEMBRAMENTO'],
       ['^FATURA DIGITAL', 'FATURA DIGITAL - RECADASTRO'],
       ['^ALTO CONSUMO', 'ALTO CONSUMO'],
       ['^CEHAB', 'CEHAB MIRACEMA'],
-      ['^ATUALIZ\\w* CONDOMINIO', 'ATUALIZAÇÃO CONDOMÍNIOS'],
+      ['^ATUALIZ\\w* CONDOMINIO', 'ATUALIZAE CONDOMÍNIOS'],
       ['^EDIFICIOS', 'EDIFÍCIOS'],
       ['^VIDA NOVA', 'VIDA NOVA'],
       ['^CARNAVAL', 'CARNAVAL'],
@@ -75,8 +80,8 @@
       ['^SA\\w* PUBLICA', 'SAÚDE PÚBLICA'],
       ['^ESCOLAS', 'ESCOLAS PÚBLICAS'],
       ['^FERIAD', 'FERIADÃO'],
-      ['^NEGOCIA', 'NEGOCIAÇÃO'],
-      ['^LOCALIZA', 'LOCALIZAÇÃO'],
+      ['^NEGOCIA', 'NEGOCIAE'],
+      ['^LOCALIZA', 'LOCALIZAE'],
       ['^CAV$', 'CAV'],
     ],
     /** Rótulos sem regra acima são unidos a um nome conhecido se forem ≥ esta similaridade. */

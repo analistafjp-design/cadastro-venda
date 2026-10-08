@@ -140,3 +140,57 @@ test('matriz equipe × projeto', async () => {
   assert.equal(cel('RIOVENIN-001', 'TITULARIDADE').taxa, 1);
   assert.equal(cel('RIORECIN-001', 'TITULARIDADE').taxa, null);
 });
+
+test('resultado por equipe em cada período: colunas do mais recente ao mais antigo', async () => {
+  const { out } = await carregarFixtures();
+  const mx = M().matrizPeriodos(out.visitas, 'dia');
+  assert.deepEqual(mx.periodos, ['2026-03-12', '2026-03-10', '2026-03-06', '2026-03-05', '2026-03-02']);
+  assert.deepEqual(mx.linhas.map((l) => l.recurso), ['RIORECIN-001', 'RIORECIN-002', 'RIOVENIN-001']);
+  const linha = (rec) => mx.linhas.find((l) => l.recurso === rec);
+  const cel = (rec, dia) => linha(rec).celulas.find((c) => c.chave === dia);
+
+  // RIORECIN-001: 3 executadas em 02/03 (1 com resultado), 1 em 10/03 e 1 em 12/03
+  assert.equal(cel('RIORECIN-001', '2026-03-02').exec, 3);
+  assert.equal(cel('RIORECIN-001', '2026-03-02').resultado, 1);
+  assert.equal(cel('RIORECIN-001', '2026-03-10').exec, 1);
+  assert.equal(cel('RIORECIN-001', '2026-03-10').resultado, 0); // só atualização cadastral
+  // RIORECIN-002: a ocorrência (visita 20) não conta; 4 executadas em 06/03, 2 com resultado
+  assert.equal(cel('RIORECIN-002', '2026-03-06').exec, 4);
+  assert.equal(cel('RIORECIN-002', '2026-03-06').resultado, 2);
+  assert.equal(cel('RIORECIN-002', '2026-03-06').taxa, 0.5);
+  // célula sem visita: taxa nula, não zero
+  assert.equal(cel('RIOVENIN-001', '2026-03-12').exec, 0);
+  assert.equal(cel('RIOVENIN-001', '2026-03-12').taxa, null);
+  // totais por equipe
+  assert.equal(linha('RIOVENIN-001').exec, 4);
+  assert.equal(linha('RIOVENIN-001').resultado, 3);
+  assert.equal(linha('RIOVENIN-001').tipo, 'Venda');
+  // o conjunto das equipes fecha com o resumo geral
+  assert.equal(mx.total.exec, 14);
+  assert.equal(mx.total.resultado, 6);
+  assert.equal(mx.linhas.reduce((s, l) => s + l.exec, 0), mx.total.exec);
+  assert.equal(mx.linhas.reduce((s, l) => s + l.celulas.reduce((t, c) => t + c.exec, 0), 0), mx.total.exec);
+});
+
+test('resultado por equipe agrupado por semana e por mês', async () => {
+  const { out } = await carregarFixtures();
+  const sem = M().matrizPeriodos(out.visitas, 'semana');
+  assert.deepEqual(sem.periodos, ['2026-03-09', '2026-03-02']);
+  const l1 = sem.linhas.find((l) => l.recurso === 'RIORECIN-001');
+  assert.deepEqual(l1.celulas.map((c) => c.exec), [2, 3]); // 10/03 e 12/03 | 02/03
+  const mes = M().matrizPeriodos(out.visitas, 'mes');
+  assert.deepEqual(mes.periodos, ['2026-03']);
+  assert.equal(mes.linhas[0].celulas[0].exec, mes.linhas[0].exec);
+});
+
+test('demandas avulsas: o que são e como ocultar', async () => {
+  const { out } = await carregarFixtures();
+  const avulsas = M().textosAvulsas(out.visitas, 5);
+  assert.equal(avulsas.length, 1);
+  assert.equal(avulsas[0].n, 1);
+  assert.match(avulsas[0].chave, /^SEM OBSERVACAO/);
+  const todas = out.visitas.length;
+  assert.equal(M().filtrar(out.visitas, { semAvulsas: true }).length, todas - 1);
+  assert.equal(M().filtrar(out.visitas, { semAvulsas: false }).length, todas);
+  assert.equal(M().textosAvulsas(M().filtrar(out.visitas, { semAvulsas: true }), 5).length, 0);
+});
