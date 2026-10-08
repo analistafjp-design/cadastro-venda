@@ -1,0 +1,12 @@
+node_modules/
+.DS_Store
+*.log
+
+# Dados reais de clientes NUNCA entram no repositório.
+dados/
+*.xlsx
+*.xls
+*.csv
+# ...exceto as planilhas sintéticas de teste e de exemplo:
+!tests/fixtures/*.xlsx
+!exemplos/*.xlsx

@@ -1,0 +1,11 @@
+{
+  "name": "cadastro-venda",
+  "version": "1.0.0",
+  "description": "Acompanhamento diário da efetividade das equipes de cadastro e venda (cruzamento de atividades e resultados pela matrícula).",
+  "private": true,
+  "scripts": {
+    "test": "node --test \"tests/*.test.js\"",
+    "fixtures": "python3 tests/fixtures/gerar.py"
+  },
+  "engines": { "node": ">=18" }
+}
