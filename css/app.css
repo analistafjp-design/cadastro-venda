@@ -206,8 +206,8 @@ table.tab { width: 100%; border-collapse: separate; border-spacing: 0; font-size
 .servicos .vazio-s { color: var(--ink-3); }
 
 /* tempos das equipes: barra de distribuição do dia */
-.dist { display: flex; height: 12px; min-width: 220px; border-radius: 6px; overflow: hidden; background: var(--surface-2); }
-.dist i { display: block; height: 100%; }
+.dist { display: flex; height: 22px; min-width: 260px; border-radius: 6px; overflow: hidden; background: var(--surface-2); }
+.dist i { display: flex; align-items: center; justify-content: center; height: 100%; font-style: normal; font-size: 11px; font-weight: 700; line-height: 1; overflow: hidden; white-space: nowrap; }
 .dist i + i { margin-left: 2px; }
 .legenda { display: flex; gap: 16px; flex-wrap: wrap; color: var(--ink-2); font-size: 12.5px; margin: 8px 0 0; }
 .legenda i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }

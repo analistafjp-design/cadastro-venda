@@ -37,18 +37,24 @@ Quatro abas, no estilo do painel de Pós-Corte (cards, tabelas limpas, claro/esc
   - **Resultado**: *Percorrido* (= Exec + Exoc), *Exec*, *Exoc*, *Com resultados* e a *taxa de resultado*;
   - **Tipo de resultado**: *Incremento de economia*, *Incremento de economia e alteração de categoria*, *Total de incremento*, *Total alteração de categoria*, *Troca de titularidade* (e *Outros resultados*, se houver: tarifa social, fatura digital, venda, negociação de débitos);
   - **Bases**: percorrido, com resultados e % de resultado de cada base (projeto);
-  - **Resultado por equipe**: só o que trouxe resultado, para as 10 equipes. O **+** sob o nome abre os serviços que trouxeram resultado e a quantidade;
+  - **Resultado por equipe**: só as equipes que trouxeram resultado no período (resultado maior que zero). O **+** sob o nome abre os serviços que trouxeram resultado e a quantidade;
   - **Por data**: dia, semana ou mês. Datas recentes aparecem como *em maturação* (o backoffice ainda está lançando).
-- **Tempos das equipes** — por equipe: **deslocamento**, **serviço**, **pausas e apoio** (refeição, DDS, checklist...) e **ociosidade**, em horas:minutos, com a média por dia trabalhado (ou o total do período) e uma barra de como o dia foi usado.
-- **Novos alvos** — listas de ação exportáveis em CSV:
+- **Tempos das equipes** — das equipes que trouxeram resultado no período: **deslocamento**, **serviço**, **pausas e apoio** (refeição, DDS, checklist...) e **ociosidade**, em horas:minutos, com a média por dia trabalhado (ou o total do período) e uma barra de como o dia foi usado, com o percentual escrito em cada trecho.
+- **Novos alvos** — listas de ação exportáveis em Excel:
   - *Revisitar*: última visita parou em cliente ausente / retornar depois / imóvel fechado, ordenadas pela **chance estimada** (taxa histórica do projeto × nº de economias);
   - *Corrigir endereço*: "endereço não localizado" (ação do backoffice);
   - *Cobrar retorno*: visitas executadas sem nenhum lançamento do backoffice;
   - *Parar de insistir*: matrículas visitadas 2+ vezes sempre "sem tratativa";
   - *Onde atuar*: taxa de resultado por cidade, bairro, setor, nº de economias, categoria... com a leitura "priorizar" / "rever".
-- **Auditoria** — de onde vem cada número: o que ficou de fora do escopo, retornos atribuídos × não atribuídos (e por quê), projetos reconhecidos e o que são as demandas avulsas, tipos de atividade usados nos tempos, arquivos carregados, ajuste da janela de cruzamento e das frentes de serviço, e o **CSV do cruzamento completo** (visita por visita) para conferir no Excel.
+- **Auditoria** — de onde vem cada número: o que ficou de fora do escopo, retornos atribuídos × não atribuídos (e por quê), projetos reconhecidos e o que são as demandas avulsas, tipos de atividade usados nos tempos, arquivos carregados, ajuste da janela de cruzamento e das frentes de serviço, e o **cruzamento completo em Excel** (visita por visita) para conferir.
 
-Os botões do topo exportam o cruzamento em **CSV** e a tela em **PDF** (impressão do navegador).
+**Exportação em Excel (.xlsx).** O botão **Exportar Excel** do topo (e os botões das listas) gera a planilha da aba aberta, **no formato analítico, uma linha por atividade, com as mesmas colunas da planilha de Atividades** (Recurso, Data, ID da Atividade, Matrícula, Status, Cidade, Bairro, Início, Fim, Duração, Tempo de Deslocamento...) mais o que o painel descobriu: projeto (base), situação da visita, percorrido, retorno do backoffice, *com resultado*, tipo de resultado, desfechos, Δ economias e dias até o retorno. Quem soma e filtra é o Excel (cada coluna já vem com filtro). Uma aba **Filtros** registra o recorte usado.
+
+- *Visão geral* e *Auditoria*: as visitas do período e dos filtros.
+- *Tempos das equipes*: aba *Dia da equipe* (início, fim, deslocamento, serviço, pausas e apoio e ociosidade de cada equipe em cada dia) e aba *Atividades* (as atividades com horário e como entram na conta).
+- *Novos alvos*: a última atividade de cada alvo da lista aberta, com tentativas, chance estimada, dias sem retorno etc.; *Onde atuar* leva as atividades dos grupos listados com a taxa, o índice e a leitura do grupo.
+
+O **Exportar PDF** usa a impressão do navegador.
 
 > **Tempos: use a exportação completa.** Refeição, DDS, carregamento de material e as demais atividades de apoio só vêm na exportação completa do sistema (não na planilha "Cadastrais"). Num dia só com visitas o almoço viraria ociosidade; por isso a aba mostra por padrão só os **dias completos** (os que têm essas atividades) e deixa a opção *Todos os dias*.
 
@@ -73,7 +79,7 @@ O app é um site estático, sem build. No GitHub: *Settings → Pages → Deploy
 ## Desenvolvimento
 
 ```bash
-npm test                         # 83 testes (Node 18+; sem dependências)
+npm test                         # 88 testes (Node 18+; sem dependências)
 python3 tests/fixtures/gerar.py  # regenera as planilhas sintéticas (requer openpyxl)
 ```
 
@@ -94,7 +100,9 @@ js/
   cruzamento.js       atribuição retorno → visita (matrícula + janela)
   metricas.js         agregações e listas de novos alvos
   pasta.js            varredura de pasta (handle, arrastar, input) e o que já foi lido
-  store.js csv.js     armazenamento local (dados e pasta lembrada) e exportação CSV
+  store.js            armazenamento local (dados e pasta lembrada)
+  xlsx-escrita.js     gerador de .xlsx próprio (sem bibliotecas)
+  exporta.js          colunas da exportação analítica (formato Atividades)
   ui-util.js ui-tabela.js ui-visao.js app.js   interface (ui-visao: cards, equipes, tempos)
 tests/                testes automatizados + planilhas sintéticas
 exemplos/             planilhas sintéticas para experimentar
