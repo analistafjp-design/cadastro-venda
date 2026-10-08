@@ -1,0 +1,269 @@
+/*
+ * metricas.js — agregações sobre as visitas já cruzadas (cruzamento.cruzar).
+ *
+ * Definições (docs/REGRAS.md):
+ *   Atividades   = alvos gerados (todas as linhas)
+ *   Executadas   = status "Finalizada"; Ocorrências = "Encerrada com Ocorrência"
+ *   Com retorno  = executadas com ao menos um retorno do backoffice atribuído
+ *   Resultado    = executadas cujo retorno é uma mudança de valor (incremento,
+ *                  categoria, titularidade, venda, tarifa social...)
+ *   Taxa de resultado = Resultado ÷ Executadas
+ */
+(function (global) {
+  'use strict';
+  const CV = (global.CV = global.CV || {});
+  const N = () => CV.normalize;
+
+  function filtrar(visitas, f) {
+    const flt = f || {};
+    return visitas.filter((v) => {
+      if (flt.de && v.data < flt.de) return false;
+      if (flt.ate && v.data > flt.ate) return false;
+      if (flt.projetos && flt.projetos.size && !flt.projetos.has(v.projeto)) return false;
+      if (flt.recursos && flt.recursos.size && !flt.recursos.has(v.recurso)) return false;
+      if (flt.cidades && flt.cidades.size && !flt.cidades.has(v.cidade || '(sem cidade)')) return false;
+      return true;
+    });
+  }
+
+  function div(a, b) {
+    return b > 0 ? a / b : null;
+  }
+
+  /** Resumo de um conjunto de visitas. */
+  function resumo(visitas) {
+    const R = CV.regras;
+    const r = {
+      total: visitas.length,
+      exec: 0,
+      oc: 0,
+      outras: 0,
+      comRetorno: 0,
+      resultado: 0,
+      atualizacao: 0,
+      sem: 0,
+      semRetorno: 0,
+      maturando: 0,
+      deltaEcon: 0,
+      classes: {},
+      colunas: {},
+    };
+    for (const c of R.classes) r.classes[c.id] = 0;
+    for (const c of R.colunasDesfecho) r.colunas[c.id] = 0;
+    const mats = new Set();
+
+    for (const v of visitas) {
+      if (v.mat) mats.add(v.mat);
+      if (v.grupoStatus === 'oc') { r.oc++; continue; }
+      if (v.grupoStatus !== 'exec') { r.outras++; continue; }
+      r.exec++;
+      if (v.maturando) r.maturando++;
+      if (!v.grupoRetorno) { r.semRetorno++; continue; }
+      r.comRetorno++;
+      if (v.grupoRetorno === 'resultado') r.resultado++;
+      else if (v.grupoRetorno === 'atualizacao') r.atualizacao++;
+      else r.sem++;
+      r.deltaEcon += v.deltaEcon || 0;
+      for (const t of v.tags) r.classes[t]++;
+      for (const c of R.colunasDesfecho) if (c.classes.some((t) => v.tags.indexOf(t) >= 0)) r.colunas[c.id]++;
+    }
+    r.matriculas = mats.size;
+    r.taxaExec = div(r.exec, r.total);
+    r.taxaRetorno = div(r.comRetorno, r.exec);
+    r.taxaResultado = div(r.resultado, r.exec);
+    r.taxaTratativa = div(r.resultado + r.atualizacao, r.exec);
+    return r;
+  }
+
+  /** Agrupa por chave (função) e devolve linhas [{chave, ...resumo}] ordenadas por executadas. */
+  function agruparPor(visitas, fnChave) {
+    const grupos = new Map();
+    for (const v of visitas) {
+      const k = fnChave(v);
+      if (!grupos.has(k)) grupos.set(k, []);
+      grupos.get(k).push(v);
+    }
+    const linhas = [];
+    for (const [chave, vs] of grupos) linhas.push(Object.assign({ chave }, resumo(vs)));
+    linhas.sort((a, b) => b.exec - a.exec || b.total - a.total || String(a.chave).localeCompare(String(b.chave), 'pt-BR'));
+    return linhas;
+  }
+
+  /** Série por dia/semana/mês (por data da VISITA), em ordem cronológica. */
+  function porPeriodo(visitas, granularidade) {
+    const chaveDe = (v) => {
+      if (granularidade === 'semana') return N().inicioSemana(v.data);
+      if (granularidade === 'mes') return v.data.slice(0, 7);
+      return v.data;
+    };
+    const linhas = agruparPor(visitas, chaveDe);
+    linhas.sort((a, b) => (a.chave < b.chave ? -1 : 1));
+    return linhas;
+  }
+
+  /** Matriz equipe × projeto: taxa de resultado e volume de cada célula. */
+  function matriz(visitas, projetosOrdem, recursosOrdem) {
+    const cel = new Map();
+    for (const v of visitas) {
+      if (v.grupoStatus !== 'exec') continue;
+      const k = v.recurso + '\u0001' + v.projeto;
+      let c = cel.get(k);
+      if (!c) { c = { exec: 0, resultado: 0 }; cel.set(k, c); }
+      c.exec++;
+      if (v.grupoRetorno === 'resultado') c.resultado++;
+    }
+    return recursosOrdem.map((rec) => ({
+      recurso: rec,
+      celulas: projetosOrdem.map((p) => {
+        const c = cel.get(rec + '\u0001' + p) || { exec: 0, resultado: 0 };
+        return { projeto: p, exec: c.exec, resultado: c.resultado, taxa: div(c.resultado, c.exec) };
+      }),
+    }));
+  }
+
+  // ---------- novos alvos ----------
+
+  /**
+   * Modelo simples e transparente de "chance estimada": taxa histórica de
+   * resultado do segmento mais específico com amostra suficiente
+   * (projeto × nº de economias -> nº de economias -> projeto -> geral).
+   */
+  function criarModeloChance(visitas) {
+    const min = CV.regras.minAmostraRanking;
+    const seg = { pq: new Map(), q: new Map(), p: new Map() };
+    let exec = 0;
+    let res = 0;
+    const somar = (mapa, k, ok) => {
+      let c = mapa.get(k);
+      if (!c) { c = { n: 0, r: 0 }; mapa.set(k, c); }
+      c.n++;
+      if (ok) c.r++;
+    };
+    for (const v of visitas) {
+      if (v.grupoStatus !== 'exec' || v.maturando) continue;
+      const ok = v.grupoRetorno === 'resultado';
+      exec++;
+      if (ok) res++;
+      somar(seg.pq, v.projeto + '\u0001' + v.qtdEconRotulo, ok);
+      somar(seg.q, v.qtdEconRotulo, ok);
+      somar(seg.p, v.projeto, ok);
+    }
+    const geral = exec ? res / exec : 0;
+    function chance(v) {
+      let c = seg.pq.get(v.projeto + '\u0001' + v.qtdEconRotulo);
+      if (c && c.n >= min) return { taxa: c.r / c.n, base: 'projeto × nº de economias', n: c.n };
+      c = seg.q.get(v.qtdEconRotulo);
+      if (c && c.n >= min) return { taxa: c.r / c.n, base: 'nº de economias', n: c.n };
+      c = seg.p.get(v.projeto);
+      if (c && c.n >= min) return { taxa: c.r / c.n, base: 'projeto', n: c.n };
+      return { taxa: geral, base: 'média geral', n: exec };
+    }
+    return { chance, geral };
+  }
+
+  /** Mais recente por matrícula; no mesmo dia, a executada vence a ocorrência. */
+  function ultimaVisitaPorMatricula(visitas) {
+    const peso = (v) => (v.grupoStatus === 'exec' ? 2 : v.grupoStatus === 'oc' ? 1 : 0);
+    const m = new Map();
+    for (const v of visitas) {
+      if (!v.mat) continue;
+      const a = m.get(v.mat);
+      if (
+        !a || v.data > a.data ||
+        (v.data === a.data && (peso(v) > peso(a) || (peso(v) === peso(a) && Number(v.id) > Number(a.id))))
+      ) m.set(v.mat, v);
+    }
+    return m;
+  }
+
+  /**
+   * Matrículas cuja ÚLTIMA visita terminou em ocorrência recuperável.
+   * `acao`: 'revisitar' | 'corrigir_endereco'. Ordena pela chance estimada.
+   */
+  function alvosOcorrencia(visitas, modelo, acao) {
+    const limite = CV.regras.limiteTentativas;
+    const porMat = new Map();
+    for (const v of visitas) {
+      if (!v.mat) continue;
+      if (!porMat.has(v.mat)) porMat.set(v.mat, []);
+      porMat.get(v.mat).push(v);
+    }
+    const ultima = ultimaVisitaPorMatricula(visitas);
+    const out = [];
+    for (const [mat, v] of ultima) {
+      if (v.grupoStatus !== 'oc' || v.acao !== acao) continue;
+      const hist = porMat.get(mat);
+      const tentativas = hist.filter((x) => x.grupoStatus === 'oc').length;
+      const ch = modelo.chance(v);
+      out.push({
+        mat, projeto: v.projeto, recurso: v.recurso, cidade: v.cidade, bairro: v.bairro, setor: v.setor,
+        endereco: v.endereco, ultimaVisita: v.data, motivo: v.motivo, tentativas,
+        escalar: tentativas >= limite, chance: ch.taxa, baseChance: ch.base, qtdEcon: v.qtdEconRotulo,
+      });
+    }
+    out.sort((a, b) => Number(a.escalar) - Number(b.escalar) || b.chance - a.chance || (a.ultimaVisita < b.ultimaVisita ? 1 : -1));
+    return out;
+  }
+
+  /** Visitas executadas há mais de N dias sem nenhum retorno do backoffice. */
+  function alvosSemRetorno(visitas, dataReferencia) {
+    const dias = CV.regras.diasSemRetorno;
+    const out = [];
+    if (!dataReferencia) return out;
+    for (const v of visitas) {
+      if (v.grupoStatus !== 'exec' || v.grupoRetorno) continue;
+      const idade = N().diasEntre(v.data, dataReferencia);
+      if (idade <= dias) continue;
+      out.push({
+        mat: v.mat, projeto: v.projeto, recurso: v.recurso, cidade: v.cidade, bairro: v.bairro,
+        endereco: v.endereco, data: v.data, dias: idade, protocolo: v.protocolo,
+      });
+    }
+    out.sort((a, b) => b.dias - a.dias);
+    return out;
+  }
+
+  /** Matrículas visitadas (executadas) 2+ vezes sem nenhum resultado/atualização: parar de insistir. */
+  function alvosEsgotados(visitas) {
+    const porMat = new Map();
+    for (const v of visitas) {
+      if (!v.mat || v.grupoStatus !== 'exec') continue;
+      if (!porMat.has(v.mat)) porMat.set(v.mat, []);
+      porMat.get(v.mat).push(v);
+    }
+    const out = [];
+    for (const [mat, vs] of porMat) {
+      if (vs.length < 2) continue;
+      // esgotado = todas as visitas já tiveram retorno e nenhuma gerou tratativa
+      if (!vs.every((v) => v.grupoRetorno === 'sem' && !v.maturando)) continue;
+      vs.sort((a, b) => (a.data < b.data ? -1 : 1));
+      const u = vs[vs.length - 1];
+      out.push({
+        mat, projeto: u.projeto, recurso: u.recurso, cidade: u.cidade, bairro: u.bairro, endereco: u.endereco,
+        visitas: vs.length, primeiraVisita: vs[0].data, ultimaVisita: u.data,
+      });
+    }
+    out.sort((a, b) => b.visitas - a.visitas || (a.ultimaVisita < b.ultimaVisita ? 1 : -1));
+    return out;
+  }
+
+  /**
+   * Territórios / perfis: linhas com amostra mínima, com índice vs. média geral
+   * (índice 2,0 = converte o dobro da média).
+   */
+  function territorios(visitas, fnChave, minExec) {
+    const min = minExec === undefined ? CV.regras.minAmostraRanking : minExec;
+    const geral = resumo(visitas);
+    const linhas = agruparPor(visitas.filter((v) => v.grupoStatus === 'exec'), fnChave)
+      .filter((l) => l.exec >= min)
+      .map((l) => Object.assign(l, { indice: geral.taxaResultado ? l.taxaResultado / geral.taxaResultado : null }));
+    linhas.sort((a, b) => (b.taxaResultado || 0) - (a.taxaResultado || 0) || b.exec - a.exec);
+    return { linhas, geral };
+  }
+
+  CV.metricas = {
+    filtrar, resumo, agruparPor, porPeriodo, matriz, criarModeloChance,
+    alvosOcorrencia, alvosSemRetorno, alvosEsgotados, territorios,
+  };
+  if (typeof module !== 'undefined' && module.exports) module.exports = CV.metricas;
+})(typeof window !== 'undefined' ? window : globalThis);
