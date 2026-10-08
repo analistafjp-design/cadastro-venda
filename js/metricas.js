@@ -7,7 +7,7 @@
  *   Com retorno  = executadas com ao menos um retorno do backoffice atribuído
  *   Resultado    = executadas cujo retorno é uma mudança de valor (incremento,
  *                  categoria, titularidade, venda, tarifa social...)
- *   Taxa de resultado = Resultado ÷ Executadas
+ *   Efetividade (taxa de resultado) = Resultado ÷ Executadas
  */
 (function (global) {
   'use strict';

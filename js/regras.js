@@ -77,7 +77,7 @@
      * Nome usado quando não há projeto identificável: demandas avulsas (pedidos do
      * atendimento/call center, solicitações das próprias equipes, instruções genéricas).
      */
-    semProjeto: 'SEM PROJETO (avulsas)',
+    semProjeto: 'Solicitada em Campo',
 
     /**
      * Unificação de nomes de projeto. Cada item: [regex aplicada à chave do
@@ -144,7 +144,7 @@
 
     /**
      * Desfechos possíveis de um retorno. "grupo" define o que conta como:
-     *   resultado   -> mudança com efeito comercial/econômico (entra na taxa de resultado)
+     *   resultado   -> mudança com efeito comercial/econômico (entra na efetividade)
      *   atualizacao -> atualização/saneamento cadastral (conta como tratativa, mas não resultado)
      *   sem         -> sem tratativa
      * Ordem = prioridade para eleger o "desfecho principal" da visita.

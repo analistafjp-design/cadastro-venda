@@ -51,11 +51,15 @@
 
     alvo.appendChild(secao('Resultado'));
     alvo.appendChild(h('div', { class: 'cartoes' },
+      // a efetividade em destaque: das visitas executadas, quantas geraram resultado
+      h('div', { class: 'cartao heroi', title: 'Efetividade = Com resultados ÷ Exec' },
+        h('div', { class: 'rot' }, h('i', { class: 'dot', style: { background: 'var(--accent)' } }), 'Efetividade'),
+        h('div', { class: 'valor', text: fmt.pct(c.taxa) }),
+        h('div', { class: 'sub', text: c.exec ? fmt.int(c.resultado) + ' de ' + fmt.int(c.exec) + ' visitas executadas geraram resultado' : 'Nenhuma visita executada no período' })),
       cartao('Percorrido', fmt.int(c.percorrido), 'var(--c-cinza)', 'Exec + Exoc: visitas em que a equipe foi ao local'),
       cartao('Exec', fmt.int(c.exec), 'var(--c-azul)', 'Atividades finalizadas'),
       cartao('Exoc', fmt.int(c.oc), 'var(--c-laranja)', 'Encerradas com ocorrência (cliente ausente, endereço não localizado...)'),
-      cartao('Com resultados', fmt.int(c.resultado), 'var(--c-verde)', 'Exec que geraram mudança de valor: incremento, categoria, titularidade, venda, tarifa social...'),
-      cartao('Taxa de resultado', fmt.pct(c.taxa), 'var(--c-roxo)', 'Com resultados ÷ Exec', 'Com resultados ÷ Exec')
+      cartao('Com resultados', fmt.int(c.resultado), 'var(--c-verde)', 'Exec que geraram mudança de valor: incremento, categoria, titularidade, venda, tarifa social...')
     ));
 
     alvo.appendChild(secao('Tipo de resultado'));
@@ -75,12 +79,12 @@
       { id: 'base', titulo: 'Base', tipo: 'txt', valor: (l) => l.chave },
       { id: 'perc', titulo: 'Percorrido', tipo: 'num', valor: (l) => l.percorrido, dica: 'Exec + Exoc' },
       { id: 'res', titulo: 'Com resultados', tipo: 'num', valor: (l) => l.resultado },
-      { id: 'taxa', titulo: '% de resultado', tipo: 'taxa', valor: (l) => l.taxaResultado, dica: 'Com resultados ÷ Exec' },
+      { id: 'taxa', titulo: 'Efetividade', tipo: 'taxa', valor: (l) => l.taxaResultado, dica: 'Com resultados ÷ Exec (visitas executadas)' },
     ];
-    const blocoBase = bloco('Bases', 'Resultado de cada base de alvos (projeto) no período.');
+    const blocoBase = bloco('Bases', 'Efetividade de cada base de alvos (projeto) no período.');
     blocoBase.appendChild(ui.criarTabela({ colunas: colsBase, linhas: linhasBase, ordem: ctx.ordemDe('visao-bases', { id: 'res', dir: 'desc' }), vazio: 'Nenhuma visita no período.' }));
     if (linhasBase.some((l) => l.chave === R.semProjeto)) {
-      blocoBase.appendChild(h('p', { class: 'nota', text: '“' + R.semProjeto + '” são demandas que não pertencem a uma base (pedidos do atendimento, solicitações das próprias equipes). Veja os textos na aba Auditoria.' }));
+      blocoBase.appendChild(h('p', { class: 'nota', text: '“' + R.semProjeto + '” são as atividades que não pertencem a uma base de alvos (pedidos do atendimento, solicitações das próprias equipes). Veja os textos na aba Auditoria.' }));
     }
     alvo.appendChild(blocoBase);
 
@@ -126,7 +130,7 @@
         h('thead', null, h('tr', null,
           h('th', { class: 'txt sem-ordem', text: 'Equipe' }),
           h('th', { class: 'sem-ordem', text: 'Com resultados' }),
-          h('th', { class: 'sem-ordem', text: '% de resultado', title: 'Com resultados ÷ Exec da equipe' }))),
+          h('th', { class: 'sem-ordem', text: 'Efetividade', title: 'Com resultados ÷ Exec da equipe' }))),
         corpo)));
     } else {
       blocoEq.appendChild(h('p', { class: 'nota', text: 'Nenhuma equipe trouxe resultado neste período. Se for um dia recente, os retornos do backoffice ainda estão chegando (em maturação).' }));
@@ -151,7 +155,7 @@
       { id: 'exec', titulo: 'Exec', tipo: 'num', valor: (l) => l.exec },
       { id: 'exoc', titulo: 'Exoc', tipo: 'num', valor: (l) => l.oc },
       { id: 'res', titulo: 'Com resultados', tipo: 'num', valor: (l) => l.resultado },
-      { id: 'taxa', titulo: '% de resultado', tipo: 'taxa', valor: (l) => l.taxaResultado },
+      { id: 'taxa', titulo: 'Efetividade', tipo: 'taxa', valor: (l) => l.taxaResultado, dica: 'Com resultados ÷ Exec (visitas executadas)' },
     ];
     const blocoData = bloco('Por data', 'Cada visita é contada no dia em que aconteceu. Datas recentes ficam “em maturação”: o backoffice leva de 1 a 3 dias para lançar o retorno.',
       segmentado([['dia', 'Dia'], ['semana', 'Semana'], ['mes', 'Mês']], gran, ctx.aoMudarGran, 'Agrupar por'));

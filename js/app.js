@@ -533,7 +533,7 @@
     if (estado.aba === 'visao' || estado.aba === 'alvos') {
       const cb = h('input', { type: 'checkbox', checked: f.semAvulsas });
       cb.addEventListener('change', () => { f.semAvulsas = cb.checked; mudouFiltro(); });
-      alvo.appendChild(h('label', { class: 'check', title: 'Esconde as atividades que não pertencem a nenhuma base de alvos (pedidos do atendimento, solicitações das próprias equipes...)' }, cb, 'Ocultar avulsas'));
+      alvo.appendChild(h('label', { class: 'check', title: 'Esconde as atividades que não pertencem a nenhuma base de alvos (“' + R.semProjeto + '”: pedidos do atendimento, solicitações das próprias equipes...)' }, cb, 'Ocultar “' + R.semProjeto + '”'));
     }
     if (estado.aba === 'visao') {
       alvo.appendChild(h('span', { class: 'info', text: fmt.int(M.resumo(visitasFiltradas()).percorrido) + ' de ' + fmt.int(estado.totalPercorrido) + ' percorridas' }));
@@ -642,7 +642,7 @@
     if (comTerritorio !== false) {
       p.push(['Cidade', f.cidade || 'Todas as do escopo']);
       p.push(['Base', f.base || 'Todas']);
-      p.push(['Avulsas', f.semAvulsas ? 'Ocultas' : 'Incluídas']);
+      p.push([R.semProjeto, f.semAvulsas ? 'Ocultas' : 'Incluídas']);
     }
     p.push(['Equipes do escopo', R.escopo.equipes.join(', ')]);
     return p;
@@ -818,13 +818,13 @@
       segmentado(Object.entries(DIMENSOES).map(([id, [nome]]) => [id, nome]), estado.dimTerr, (d) => { estado.dimTerr = d; renderPainel(); }),
       h('span', { class: 'espaco' })
     ));
-    alvo.appendChild(h('p', { class: 'nota', style: { margin: '0 0 10px' }, text: `Onde a taxa de resultado é maior ou menor que a média do recorte. Só entram grupos com ${R.minAmostraRanking}+ visitas executadas. "Priorizar": gerar mais alvos com esse perfil/território. "Rever": a base está rendendo bem abaixo da média.` }));
+    alvo.appendChild(h('p', { class: 'nota', style: { margin: '0 0 10px' }, text: `Onde a efetividade é maior ou menor que a média do recorte. Só entram grupos com ${R.minAmostraRanking}+ visitas executadas. "Priorizar": gerar mais alvos com esse perfil/território. "Rever": a base está rendendo bem abaixo da média.` }));
     const leitura = (l) => (l.indice >= 1.3 ? 'alta' : l.indice <= 0.5 ? 'baixa' : '');
     const cols = [
       colTxt('dim', nomeDim, (l) => l.chave),
       colNum('exec', 'Executadas', (l) => l.exec),
       colNum('res', 'Resultado', (l) => l.resultado),
-      { id: 'taxa', titulo: '% Resultado', tipo: 'taxa', valor: (l) => l.taxaResultado },
+      { id: 'taxa', titulo: 'Efetividade', tipo: 'taxa', valor: (l) => l.taxaResultado, dica: 'Resultado ÷ Executadas' },
       colNum('ind', 'Índice', (l) => l.indice, { render: (l) => fmt.ind(l.indice) }),
       colNum('de', 'Δ economias', (l) => l.deltaEcon, { render: (l) => fmt.sinal(l.deltaEcon) }),
       colTxt('lei', 'Leitura', (l) => leitura(l), {
@@ -837,7 +837,7 @@
     const linhasV = vs.map((v) => ({ visita: v, grupo: porChave.get(fn(v)) })).filter((x) => x.grupo);
     const extras = [
       { titulo: nomeDim + ' (grupo)', valor: (l) => l.grupo.chave },
-      { titulo: 'Taxa de resultado do grupo', tipo: 'pct', valor: (l) => l.grupo.taxaResultado },
+      { titulo: 'Efetividade do grupo', tipo: 'pct', valor: (l) => l.grupo.taxaResultado },
       { titulo: 'Índice do grupo', tipo: 'num', valor: (l) => (l.grupo.indice === null ? null : Math.round(l.grupo.indice * 100) / 100) },
       { titulo: 'Leitura', valor: (l) => (leitura(l.grupo) === 'alta' ? 'priorizar' : leitura(l.grupo) === 'baixa' ? 'rever' : '') },
     ];
@@ -914,7 +914,7 @@
       ['Visitas sem matrícula válida (não cruzam)', a.visitasSemMatricula],
       ['Projeto unido por semelhança de escrita', proj.porOrigem.similar],
       ['Projeto novo (sem regra cadastrada)', proj.porOrigem.novo],
-      ['Demandas avulsas (sem projeto)', proj.porOrigem.sem],
+      ['“' + R.semProjeto + '” (sem projeto)', proj.porOrigem.sem],
     ])));
     const novos = proj.novos.filter((n) => !R.projetos.some((p) => p[1] === n));
     if (novos.length) alvo.appendChild(h('p', { class: 'nota', text: 'Projetos novos detectados (ainda sem regra): ' + novos.join(', ') + '.' }));
@@ -925,7 +925,7 @@
         h('b', { text: '“' + R.semProjeto + '”' }),
         ' são atividades cujo texto de abertura não começa com o nome de uma base: em geral pedidos do atendimento (call center, WhatsApp), solicitações das próprias equipes e instruções avulsas. Os textos mais comuns:',
         h('ul', { class: 'lista-simples' }, tops.map((t) => h('li', null, h('code', { text: t.exemplo }), ' — ' + fmt.int(t.n)))),
-        'Use “Ocultar avulsas” nos filtros para olhar só as bases. Se algum desses textos for, na verdade, uma base de alvos, cadastre o nome na lista ',
+        'Use “Ocultar ' + R.semProjeto + '” nos filtros para olhar só as bases. Se algum desses textos for, na verdade, uma base de alvos, cadastre o nome na lista ',
         h('code', { text: 'projetos' }), ' de ', h('code', { text: 'js/regras.js' }), '.'));
     }
 

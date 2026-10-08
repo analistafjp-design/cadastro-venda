@@ -123,11 +123,11 @@
       { id: 'oc', titulo: 'Ocorrências', tipo: 'num', valor: (l) => l.oc, dica: 'Status "Encerrada com Ocorrência" (visita sem execução)' },
       { id: 'ret', titulo: 'Com retorno', tipo: 'num', valor: (l) => l.comRetorno, dica: 'Executadas que já têm lançamento do backoffice na planilha de Resultados' },
       { id: 'res', titulo: 'Resultado', tipo: 'num', valor: (l) => l.resultado, dica: 'Executadas com mudança de valor: incremento/alteração de economia, categoria, titularidade, venda, tarifa social, fatura digital, negociação de débitos' },
-      { id: 'taxa', titulo: '% Resultado', tipo: 'taxa', valor: (l) => l.taxaResultado, dica: 'Resultado ÷ Executadas' },
+      { id: 'taxa', titulo: 'Efetividade', tipo: 'taxa', valor: (l) => l.taxaResultado, dica: 'Resultado ÷ Executadas' },
     ];
     if (o.indice) {
       cols.push({
-        id: 'ind', titulo: 'Índice', tipo: 'num', dica: 'Taxa de resultado ÷ taxa geral do período (2,0× = converte o dobro da média)',
+        id: 'ind', titulo: 'Índice', tipo: 'num', dica: 'Efetividade ÷ efetividade geral do período (2,0× = converte o dobro da média)',
         valor: (l) => (!l.ehTotal && l.exec >= R.minAmostra && geral.taxaResultado ? l.taxaResultado / geral.taxaResultado : null),
         render: (l) => {
           if (l.ehTotal) return ''; // o total é a própria média: índice sempre 1,0×
