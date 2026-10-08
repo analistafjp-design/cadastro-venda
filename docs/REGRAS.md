@@ -38,6 +38,14 @@ Os arquivos são lidos **pelo nome do cabeçalho** (sem diferenciar maiúsculas,
 | TIPO DE ORDEM DE SERVIÇO, QUAL FOI A ALTERAÇÃO DE ECONOMIA?, TRATATIVA CADASTRAL, TIPO DE ALTERAÇÃO | Definem o desfecho |
 | DE:, PARA: | Quantas economias foram acrescidas/retiradas |
 
+## 1.1 Leitura de uma pasta
+
+- Percorre a pasta e as subpastas (até 8 níveis), olhando só arquivos `.xlsx`. Ignora temporários do Excel (`~$...`), arquivos e pastas ocultos (que começam com `.`) e outros formatos.
+- **Reconhece o tipo pelo cabeçalho**, não pelo nome do arquivo: tem "ID da Atividade" e "Status da Atividade" → Atividades; tem "MATRICULA S/ DIGITO" (ou "Hora de início" + "Tipo de Ordem de Serviço") → Resultados. Qualquer outra planilha é ignorada e anotada, para não ser aberta de novo.
+- **Só lê o que é novo ou mudou**: cada arquivo tem uma assinatura (caminho + tamanho + data de modificação). Igual ao da última leitura → pulado.
+- Os arquivos são lidos do **mais antigo para o mais novo**; se a mesma atividade/retorno (mesmo ID) aparecer em mais de um, vale o do arquivo mais recente.
+- Falha em um arquivo (aberto/bloqueado, só na nuvem, corrompido) não interrompe os demais: vai para um aviso com o nome dos arquivos.
+
 ## 2. Nome do projeto/base
 
 1. Pega o texto de abertura e extrai o rótulo: o que vem depois de `PROJETO` até os dois-pontos (`PROJETO INCREMENTO: VERIFICAR ...` → `INCREMENTO`).

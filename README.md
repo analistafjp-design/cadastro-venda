@@ -13,11 +13,17 @@ e responde, **separado por data**: *quantas visitas geraram resultado, por equip
 
 ## Como usar (3 passos)
 
-1. Abra o `index.html` (duplo clique funciona; ou publique no GitHub Pages — veja abaixo).
-2. Arraste as duas planilhas `.xlsx` para a tela. O app reconhece qual é qual, em qualquer ordem.
+1. Abra o painel (`index.html` com duplo clique, ou o link do GitHub Pages).
+2. Clique em **Carregar pasta** e escolha a pasta onde ficam as planilhas — por exemplo **OneDrive › Cadastro e Venda**. O app procura nela (e nas subpastas) as planilhas de **Atividades** e de **Resultados**, reconhece cada uma sozinho, ignora o que não for uma das duas e cruza tudo pela matrícula.
 3. Use o filtro de período e as abas.
 
-**Rotina diária:** abra o painel e arraste o arquivo novo de Atividades e a planilha de Resultados atualizada. O app **acumula**: atividades e retornos já carregados são reconhecidos pelo ID e atualizados, nada duplica. Os dados ficam guardados no próprio navegador deste computador.
+**Rotina diária:** o navegador (Chrome/Edge) *lembra a pasta*. No dia seguinte basta abrir o painel: ele já traz o que for novo; se pedir permissão, clique em **Atualizar pasta**. Só são lidas as planilhas **novas ou alteradas** (o app compara nome, tamanho e data de modificação), então a atualização é rápida. Atividades e retornos já carregados são reconhecidos pelo ID e atualizados; nada duplica.
+
+**Outras formas de carregar:** arrastar a pasta (ou as planilhas) para a tela; **Adicionar arquivos** para escolher planilhas soltas; **Trocar pasta** para apontar outra.
+
+**OneDrive.** O painel lê a pasta que o OneDrive *sincroniza no seu computador* (algo como `C:\Users\você\OneDrive\Cadastro e Venda`); ele não acessa o OneDrive pela internet. Se as planilhas estiverem só na nuvem (ícone de nuvem), o Windows baixa cada uma ao ler — funciona, mas pode demorar; para agilizar, clique com o botão direito na pasta → *Sempre manter neste dispositivo*. Planilhas abertas no Excel geram um arquivo temporário `~$...xlsx`, que é ignorado.
+
+**Navegadores.** Chrome e Edge: escolher uma vez e lembrar a pasta. Firefox e Safari: o botão *Carregar pasta* funciona, mas a pasta precisa ser escolhida de novo a cada visita (não permitem lembrar). Se o Chrome recusar uma pasta por ser "do sistema", escolha a subpasta *Cadastro e Venda*.
 
 > **Privacidade.** Os arquivos são lidos no navegador; nada é enviado a servidor algum e **nenhum dado de cliente está neste repositório** (`*.xlsx` está no `.gitignore`, exceto os exemplos sintéticos).
 
@@ -54,7 +60,7 @@ O app é um site estático, sem build. No GitHub: *Settings → Pages → Deploy
 ## Desenvolvimento
 
 ```bash
-npm test                         # 59 testes (Node 18+; sem dependências)
+npm test                         # 66 testes (Node 18+; sem dependências)
 python3 tests/fixtures/gerar.py  # regenera as planilhas sintéticas (requer openpyxl)
 ```
 
@@ -72,7 +78,8 @@ js/
   dados.js            colunas, limpeza e derivação
   cruzamento.js       atribuição retorno → visita (matrícula + janela)
   metricas.js         agregações e listas de novos alvos
-  store.js csv.js     armazenamento local e exportação CSV
+  pasta.js            varredura de pasta (handle, arrastar, input) e o que já foi lido
+  store.js csv.js     armazenamento local (dados e pasta lembrada) e exportação CSV
   ui-*.js app.js      interface
 tests/                testes automatizados + planilhas sintéticas
 exemplos/             planilhas sintéticas para experimentar
