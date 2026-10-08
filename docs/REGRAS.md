@@ -24,7 +24,7 @@ Os arquivos são lidos **pelo nome do cabeçalho** (sem diferenciar maiúsculas,
 | Motivo de Não Execução - Normal | Define o que é revisitável | não |
 | Categoria, Quantidade De Economia, Situação Do Imóvel | Perfil do alvo | não |
 
-\* Sem a *Observação* tudo cai em "SEM PROJETO" e a análise por base perde o sentido.
+\* Sem a *Observação* tudo cai em "Solicitada em Campo" e a análise por base perde o sentido.
 
 > **Sobre o "Parecer de campo".** No arquivo recebido, o nome da base está na coluna **Observação** (texto de abertura da atividade). Na exportação completa, "Parecer De Campo" é o texto livre que o técnico escreve ao final da visita. O app procura o projeto primeiro em *Observação* e, se não achar, em *Parecer De Campo* (lista `colunasProjeto` em `regras.js`).
 
@@ -60,7 +60,7 @@ O painel considera só as **10 equipes** e as **12 cidades** da operação (`esc
 1. Pega o texto de abertura e extrai o rótulo: o que vem depois de `PROJETO` até os dois-pontos (`PROJETO INCREMENTO: VERIFICAR ...` → `INCREMENTO`).
 2. Compara a chave do rótulo (maiúsculas, sem acento, sem caracteres quebrados `¿`) com a lista `projetos` de `regras.js`. A primeira regra que casar define o nome final.
 3. Sem regra: se o rótulo for muito parecido (≥ 88%) com um nome já conhecido, é unido a ele; senão vira um projeto novo (aparece na Auditoria).
-4. Textos sem a palavra `PROJETO` só são aceitos se baterem numa regra com rótulo curto (ex.: `LNA - VARREDURA - ...`). O resto vira `SEM PROJETO`.
+4. Textos sem a palavra `PROJETO` só são aceitos se baterem numa regra com rótulo curto (ex.: `LNA - VARREDURA - ...`). O resto vira `Solicitada em Campo`.
 
 Unificações já feitas (variações do mesmo projeto → um só):
 
@@ -81,7 +81,7 @@ Unificações já feitas (variações do mesmo projeto → um só):
 
 **Nomes terminados em "AE"** (`LOCALIZAE`, `VERIFICAE`, `ATUALIZAE`, `NEGOCIAE`) são os nomes dos projetos e aparecem assim no texto de abertura; acento realmente perdido aparece como `¿` (`SA¿E`, `CART¿`). Por isso os primeiros são mantidos como estão.
 
-**SEM PROJETO (avulsas).** Atividades cujo texto de abertura não começa com o nome de um projeto: pedidos do atendimento (call center, WhatsApp), solicitações das próprias equipes (`SOLICITADO PELA EQUIPE ...`), instruções genéricas e atividades sem texto. Não são uma base de alvos gerada; entram nas contas de equipe e de dia, e o filtro *Ocultar avulsas* as retira.
+**Solicitada em Campo** (antes “SEM PROJETO (avulsas)”; o nome está em `semProjeto` de `regras.js`). Atividades cujo texto de abertura não começa com o nome de um projeto: pedidos do atendimento (call center, WhatsApp), solicitações das próprias equipes (`SOLICITADO PELA EQUIPE ...`), instruções genéricas e atividades sem texto. Não são uma base de alvos gerada; entram nas contas de equipe e de dia, e o filtro *Ocultar “Solicitada em Campo”* as retira.
 
 Se discordar de alguma união (por exemplo, separar `VARREDURA - INCREMENTO` de `VARREDURA`), edite a lista `projetos`.
 
@@ -140,12 +140,12 @@ Cada retorno cai em exatamente um destes baldes (a Auditoria mostra os números 
 | % Exec. | Executadas ÷ Atividades |
 | Com retorno | Executadas com ao menos um retorno atribuído |
 | Resultado | Executadas cujo retorno é do grupo *resultado* |
-| **% Resultado** | **Resultado ÷ Executadas** |
+| **Efetividade (% de resultado)** | **Resultado ÷ Executadas** — o número em destaque na Visão geral |
 | Atualização | Executadas cujo melhor retorno é só atualização cadastral |
 | Sem tratativa | Executadas cujos retornos foram todos "sem tratativa" |
 | Sem retorno | Executadas sem retorno atribuído |
 | Δ economias | Soma líquida de economias acrescidas |
-| Índice | % Resultado da linha ÷ % Resultado geral (só com 10+ executadas) |
+| Índice | Efetividade da linha ÷ efetividade geral (só com 10+ executadas) |
 
 - As colunas de desfecho (Incremento, Categoria...) contam visitas que **incluem** aquele desfecho; uma visita pode ter mais de um, então não somam o total.
 
@@ -191,7 +191,7 @@ Todo arquivo exportado é `.xlsx`, uma linha por atividade, com as colunas da pl
 | Corrigir endereço | Última visita em *endereço não localizado* / *ramal ou rede não localizado*. |
 | Cobrar retorno | Visita executada há mais de 5 dias (até o último retorno carregado) sem nenhum retorno. |
 | Parar de insistir | 2+ visitas executadas, todas com retorno "sem tratativa". |
-| Onde atuar | Taxa de resultado por território/perfil (mínimo de 20 executadas); índice ≥ 1,3 → *priorizar*; ≤ 0,5 → *rever*. |
+| Onde atuar | Efetividade por território/perfil (mínimo de 20 executadas); índice ≥ 1,3 → *priorizar*; ≤ 0,5 → *rever*. |
 
 **Chance estimada** (lista *Revisitar*): taxa histórica de resultado do segmento mais específico com 20+ visitas — projeto × nº de economias, depois nº de economias, depois projeto, depois média geral. É uma média histórica transparente, não um modelo estatístico: serve para ordenar, não para prometer.
 
