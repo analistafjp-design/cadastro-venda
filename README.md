@@ -36,7 +36,7 @@ Quatro abas, no estilo do painel de Pós-Corte (cards, tabelas limpas, claro/esc
 - **Visão geral** — o que importa para decidir, sem um monte de números:
   - **Efetividade** em destaque no topo (das visitas executadas, quantas geraram resultado) e, ao lado, *Percorrido* (= Exec + Exoc), *Exec*, *Exoc* e *Com resultados*;
   - **Tipo de resultado**: *Incremento de economia*, *Incremento de economia e alteração de categoria*, *Total de incremento*, *Total alteração de categoria*, *Troca de titularidade* (e *Outros resultados*, se houver: tarifa social, fatura digital, venda, negociação de débitos);
-  - **Bases**: percorrido, com resultados e efetividade de cada base (projeto). A linha **Solicitada em Campo** reúne as atividades que não são de nenhuma base (pedidos do atendimento, solicitações das próprias equipes); o filtro *Ocultar “Solicitada em Campo”* as tira da análise;
+  - **Bases**: percorrido, com resultados e efetividade de cada base (projeto). A linha **SOLICITADA EM CAMPO** reúne as atividades que não são de nenhuma base (pedidos do atendimento, solicitações das próprias equipes); o filtro *Ocultar “SOLICITADA EM CAMPO”* as tira da análise;
   - **Resultado por equipe**: só as equipes que trouxeram resultado no período (resultado maior que zero). O **+** sob o nome abre os serviços que trouxeram resultado e a quantidade;
   - **Por data**: dia, semana ou mês. Datas recentes aparecem como *em maturação* (o backoffice ainda está lançando).
 - **Tempos das equipes** — das equipes que trouxeram resultado no período: **deslocamento**, **serviço**, **pausas e apoio** (refeição, DDS, checklist...) e **ociosidade**, em horas:minutos, com a média por dia trabalhado (ou o total do período) e uma barra de como o dia foi usado, com o percentual escrito em cada trecho.
@@ -46,7 +46,7 @@ Quatro abas, no estilo do painel de Pós-Corte (cards, tabelas limpas, claro/esc
   - *Cobrar retorno*: visitas executadas sem nenhum lançamento do backoffice;
   - *Parar de insistir*: matrículas visitadas 2+ vezes sempre "sem tratativa";
   - *Onde atuar*: efetividade por cidade, bairro, setor, nº de economias, categoria... com a leitura "priorizar" / "rever".
-- **Auditoria** — de onde vem cada número: o que ficou de fora do escopo, retornos atribuídos × não atribuídos (e por quê), projetos reconhecidos e os textos de “Solicitada em Campo”, tipos de atividade usados nos tempos, arquivos carregados, ajuste da janela de cruzamento e das frentes de serviço, e o **cruzamento completo em Excel** (visita por visita) para conferir.
+- **Auditoria** — de onde vem cada número: o que ficou de fora do escopo, retornos atribuídos × não atribuídos (e por quê), projetos reconhecidos e os textos de “SOLICITADA EM CAMPO”, tipos de atividade usados nos tempos, arquivos carregados, ajuste da janela de cruzamento e das frentes de serviço, e o **cruzamento completo em Excel** (visita por visita) para conferir.
 
 **Exportação em Excel (.xlsx).** O botão **Exportar Excel** do topo (e os botões das listas) gera a planilha da aba aberta, **no formato analítico, uma linha por atividade, com as mesmas colunas da planilha de Atividades** (Recurso, Data, ID da Atividade, Matrícula, Status, Cidade, Bairro, Início, Fim, Duração, Tempo de Deslocamento...) mais o que o painel descobriu: projeto (base), situação da visita, percorrido, retorno do backoffice, *com resultado*, tipo de resultado, desfechos, Δ economias e dias até o retorno. Quem soma e filtra é o Excel (cada coluna já vem com filtro). Uma aba **Filtros** registra o recorte usado.
 

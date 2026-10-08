@@ -77,7 +77,7 @@
      * Nome usado quando não há projeto identificável: demandas avulsas (pedidos do
      * atendimento/call center, solicitações das próprias equipes, instruções genéricas).
      */
-    semProjeto: 'Solicitada em Campo',
+    semProjeto: 'SOLICITADA EM CAMPO',
 
     /**
      * Unificação de nomes de projeto. Cada item: [regex aplicada à chave do
