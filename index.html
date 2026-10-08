@@ -19,10 +19,13 @@
         </div>
       </div>
       <div class="acoes">
-        <button class="btn primario" id="btn-adicionar" type="button">Escolher arquivos</button>
+        <button class="btn primario" id="btn-pasta" type="button">Carregar pasta</button>
+        <button class="btn fantasma" id="btn-trocar-pasta" type="button" hidden>Trocar pasta</button>
+        <button class="btn" id="btn-adicionar" type="button">Adicionar arquivos</button>
         <button class="btn" id="btn-exportar" type="button" hidden>Exportar cruzamento (CSV)</button>
         <button class="btn fantasma" id="btn-limpar" type="button" hidden>Limpar dados</button>
         <input id="arquivo" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple hidden>
+        <input id="pasta" type="file" webkitdirectory multiple hidden>
       </div>
     </div>
   </header>
@@ -34,9 +37,13 @@
   <main>
     <section id="vazio" class="vazio wrap">
       <div class="caixa" id="caixa">
-        <h2>Arraste as planilhas aqui</h2>
-        <p>Solte a planilha de <b>Atividades</b> (alvos visitados) e a de <b>Resultados</b> (retornos do backoffice). O app reconhece cada uma sozinho e cruza as duas pela matrícula.</p>
-        <button class="btn primario" id="btn-escolher" type="button">Escolher arquivos (.xlsx)</button>
+        <h2>Aponte a pasta com as planilhas</h2>
+        <p>Escolha a pasta (ex.: <b>OneDrive › Cadastro e Venda</b>). O app procura nela, inclusive nas subpastas, as planilhas de <b>Atividades</b> (alvos visitados) e de <b>Resultados</b> (retornos do backoffice), reconhece cada uma sozinho e cruza pela matrícula. Nas próximas vezes lê só o que for novo.</p>
+        <div class="acoes-vazio">
+          <button class="btn primario" id="btn-escolher-pasta" type="button">Escolher a pasta (OneDrive)</button>
+          <button class="btn" id="btn-escolher" type="button">ou escolher arquivos soltos</button>
+        </div>
+        <p class="dica-vazio">Também dá para arrastar a pasta (ou as planilhas) para esta área. Use a pasta que o OneDrive sincroniza no seu computador.</p>
         <div class="tipos">
           <div><b>Atividades</b><span>Exportação do sistema de campo ou a planilha "Cadastrais". Usa: Recurso, ID da Atividade, Matrícula, Data, Status, Observação (nome do projeto), Cidade, Bairro, Área de Trabalho, Motivo de Não Execução, Categoria, Quantidade de Economia.</span></div>
           <div><b>Resultados</b><span>Planilha do formulário do backoffice. Usa: Id, Hora de início, Matrícula s/ dígito, Frente de Serviço, Tipo de Ordem de Serviço, Alteração de Economia, DE/PARA, Tratativa Cadastral, Tipo de Alteração.</span></div>
@@ -64,6 +71,7 @@
   <script src="js/dados.js"></script>
   <script src="js/cruzamento.js"></script>
   <script src="js/metricas.js"></script>
+  <script src="js/pasta.js"></script>
   <script src="js/store.js"></script>
   <script src="js/csv.js"></script>
   <script src="js/ui-util.js"></script>

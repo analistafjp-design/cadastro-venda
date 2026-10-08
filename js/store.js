@@ -9,8 +9,9 @@
   const CV = (global.CV = global.CV || {});
 
   const NOME_BD = 'cadastro-venda';
-  const VERSAO = 1;
+  const VERSAO = 2;
   const STORES = { atividades: 'id', resultados: 'id', arquivos: 'seq' };
+  const CONFIG = 'config'; // guarda a pasta escolhida (handle) e preferências
 
   let dbPromessa = null;
 
@@ -25,6 +26,7 @@
         for (const [nome, chave] of Object.entries(STORES)) {
           if (!db.objectStoreNames.contains(nome)) db.createObjectStore(nome, { keyPath: chave, autoIncrement: nome === 'arquivos' });
         }
+        if (!db.objectStoreNames.contains(CONFIG)) db.createObjectStore(CONFIG, { keyPath: 'chave' });
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error || new Error('Falha ao abrir o armazenamento local'));
@@ -72,6 +74,7 @@
     });
   }
 
+  /** Limpa os dados (atividades, retornos, arquivos). A pasta escolhida é mantida. */
   async function limpar() {
     const db = await abrir();
     await transacao(db, Object.keys(STORES), 'readwrite', (tx) => {
@@ -79,6 +82,27 @@
     });
   }
 
-  CV.store = { abrir, carregar, salvar, limpar };
+  async function salvarConfig(chave, valor) {
+    const db = await abrir();
+    await transacao(db, [CONFIG], 'readwrite', (tx) => {
+      tx.objectStore(CONFIG).put(Object.assign({ chave }, valor));
+    });
+  }
+
+  async function lerConfig(chave) {
+    const db = await abrir();
+    return new Promise((resolve, reject) => {
+      const r = db.transaction([CONFIG], 'readonly').objectStore(CONFIG).get(chave);
+      r.onsuccess = () => resolve(r.result || null);
+      r.onerror = () => reject(r.error);
+    });
+  }
+
+  async function apagarConfig(chave) {
+    const db = await abrir();
+    await transacao(db, [CONFIG], 'readwrite', (tx) => { tx.objectStore(CONFIG).delete(chave); });
+  }
+
+  CV.store = { abrir, carregar, salvar, limpar, salvarConfig, lerConfig, apagarConfig };
   if (typeof module !== 'undefined' && module.exports) module.exports = CV.store;
 })(typeof window !== 'undefined' ? window : globalThis);

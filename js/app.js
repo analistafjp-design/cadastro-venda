@@ -33,6 +33,7 @@
     dimTerr: 'cidade',
     ordem: {},
     persistente: true,
+    pasta: null, // { handle, nome, ultima } — pasta lembrada (só Chrome/Edge)
   };
 
   // ---------------------------------------------------------------- mensagens
@@ -61,22 +62,60 @@
 
   // ---------------------------------------------------------------- carga de arquivos
 
-  async function receberArquivos(lista) {
-    const arquivos = Array.from(lista).filter((f) => /\.xlsx$/i.test(f.name) || f.type.includes('spreadsheetml'));
-    const ignorados = Array.from(lista).length - arquivos.length;
-    if (ignorados > 0) mensagem('aviso', ignorados + ' arquivo(s) ignorado(s): só aceito planilhas .xlsx do Excel.');
-    if (!arquivos.length) return;
+  const assinaturasLidas = () => new Set(estado.arquivos.map((a) => a.assinatura).filter(Boolean));
+
+  /**
+   * Ponto único de entrada: arquivos soltos, pasta escolhida, pasta arrastada.
+   * `lista`: Files ou itens { file, caminho }. `opc.pasta`: modo pasta (lê só o que é novo
+   * ou mudou, reconhece Atividades/Resultados sozinho e resume tudo numa mensagem).
+   */
+  async function receberArquivos(lista, opc) {
+    const o = opc || {};
+    const itens = Array.from(lista).map((x) => (x && x.file ? x : { file: x, caminho: x.webkitRelativePath || x.name }));
+    await processarItens(itens, o);
+  }
+
+  async function processarItens(itens, o) {
+    const P = CV.pasta;
+    const pasta = !!o.pasta;
+    const nomePasta = o.nomePasta || 'selecionada';
+    const falhas = (o.errosListagem || []).map((e) => ({ caminho: e.caminho, msg: e.erro && e.erro.message ? e.erro.message : 'não consegui abrir' }));
+    let fila;
+    let plano = { planilhas: 0, pulados: 0, outros: 0 };
+
+    if (pasta) {
+      plano = P.planejar(itens, assinaturasLidas());
+      fila = plano.processar;
+    } else {
+      fila = itens.filter((i) => P.ehPlanilha(i.caminho) || /spreadsheetml/.test(i.file.type || ''));
+      const ign = itens.length - fila.length;
+      if (ign > 0) mensagem('aviso', ign + ' arquivo(s) ignorado(s): só aceito planilhas .xlsx do Excel.');
+    }
+
+    if (!fila.length) {
+      if (!pasta) return;
+      if (!plano.planilhas && !falhas.length) mensagem('aviso', 'Não encontrei planilhas .xlsx na pasta “' + nomePasta + '” (procurei também nas subpastas).');
+      else if (plano.planilhas && !o.silencioso) mensagem('ok', 'Pasta “' + nomePasta + '”: nada novo desde a última leitura (' + plano.planilhas + ' planilha(s) já carregada(s)).');
+      if (falhas.length) mensagem('erro', textoFalhas(falhas));
+      return;
+    }
+
     const ov = sobreposicao('Lendo arquivos…');
+    const cont = { atividades: 0, resultados: 0, ignorados: [], avisos: new Set() };
     let mudou = false;
     try {
-      for (const f of arquivos) {
-        ov.texto('Lendo ' + f.name + '…');
+      for (let i = 0; i < fila.length; i++) {
+        const it = fila[i];
+        const prefixo = fila.length > 1 ? 'Lendo ' + (i + 1) + ' de ' + fila.length + ': ' : 'Lendo ';
+        ov.texto(prefixo + it.file.name + '…');
         await pausa();
         try {
-          if (await carregarArquivo(f, ov)) mudou = true;
+          const r = await carregarArquivo(it, ov, pasta);
+          if (r.status === 'ok') { mudou = true; cont[r.tipo]++; r.avisos.forEach((a) => cont.avisos.add(a)); }
+          else if (r.status === 'ignorado') cont.ignorados.push(it.caminho);
         } catch (e) {
           console.error(e);
-          mensagem('erro', f.name + ': ' + (e && e.message ? e.message : 'não consegui ler este arquivo.'));
+          falhas.push({ caminho: it.caminho, msg: e && e.message ? e.message : 'não consegui ler este arquivo.' });
         }
       }
       if (mudou) {
@@ -91,15 +130,44 @@
     } finally {
       ov.fechar();
     }
+
+    if (pasta) {
+      const partes = [];
+      if (cont.atividades) partes.push(cont.atividades + ' de Atividades');
+      if (cont.resultados) partes.push(cont.resultados + ' de Resultados');
+      let t = 'Pasta “' + nomePasta + '”: ' + plano.planilhas + ' planilha(s) .xlsx encontrada(s)';
+      t += partes.length ? ' — lidas ' + partes.join(' e ') : ' — nenhuma é de Atividades ou Resultados';
+      if (plano.pulados) t += '; ' + plano.pulados + ' já lida(s) antes (puladas)';
+      if (cont.ignorados.length) t += '; ' + cont.ignorados.length + ' não é/são Atividades nem Resultados (ignorada(s): ' + cont.ignorados.slice(0, 3).map((c) => c.split('/').pop()).join(', ') + (cont.ignorados.length > 3 ? '…' : '') + ')';
+      mensagem(partes.length ? 'ok' : 'aviso', t + '.');
+    }
+    for (const a of cont.avisos) mensagem('aviso', a);
+    if (falhas.length) mensagem('erro', textoFalhas(falhas));
   }
 
-  async function carregarArquivo(f, ov) {
+  function textoFalhas(falhas) {
+    const lista = falhas.slice(0, 3).map((f) => f.caminho.split('/').pop() + ' (' + f.msg + ')').join('; ');
+    return 'Não consegui ler ' + falhas.length + ' arquivo(s): ' + lista + (falhas.length > 3 ? '…' : '') +
+      '. Se estão só na nuvem do OneDrive, clique com o botão direito na pasta → “Sempre manter neste dispositivo” e tente de novo; se estiverem abertos no Excel, feche-os.';
+  }
+
+  /** Lê um arquivo. Devolve { status: 'ok'|'ignorado', tipo?, avisos[] }; erros viram exceção. */
+  async function carregarArquivo(item, ov, emPasta) {
+    const f = item.file;
+    const nome = emPasta ? item.caminho : f.name;
+    const assinatura = CV.pasta.assinatura(item);
     const buf = await f.arrayBuffer();
     const cab = await CV.xlsx.lerPlanilha(buf, { soCabecalho: true });
     const tipo = CV.dados.detectarTipo(cab.cabecalho);
     if (!tipo) {
-      mensagem('erro', f.name + ': não reconheci o formato. Esperava a planilha de Atividades (com "ID da Atividade", "Matrícula", "Status da Atividade") ou a de Resultados (com "MATRICULA S/ DIGITO", "Hora de início").');
-      return false;
+      if (!emPasta) {
+        throw new Error('não reconheci o formato. Esperava a planilha de Atividades (com "ID da Atividade", "Matrícula", "Status da Atividade") ou a de Resultados (com "MATRICULA S/ DIGITO", "Hora de início").');
+      }
+      // numa pasta pode haver outras planilhas: anota para não reabrir toda vez
+      const info = { nome, tipo: 'ignorado', assinatura, quando: new Date().toISOString() };
+      estado.arquivos.push(info);
+      await persistirInfo(info);
+      return { status: 'ignorado', avisos: [] };
     }
     const campos = tipo === 'atividades' ? CV.dados.CAMPOS_ATIVIDADES : CV.dados.CAMPOS_RESULTADOS;
     const obrig = tipo === 'atividades' ? CV.dados.OBRIGATORIOS_ATIVIDADES : CV.dados.OBRIGATORIOS_RESULTADOS;
@@ -108,10 +176,8 @@
       aoProgresso: (n) => ov.texto('Lendo ' + f.name + ' — ' + fmt.int(n) + ' linhas…'),
     });
     const faltam = obrig.filter((c) => dados.faltando.includes(c));
-    if (faltam.length) {
-      mensagem('erro', f.name + ': não encontrei a(s) coluna(s) ' + faltam.map((c) => '"' + campos[c][0] + '"').join(', ') + '.');
-      return false;
-    }
+    if (faltam.length) throw new Error('não encontrei a(s) coluna(s) ' + faltam.map((c) => '"' + campos[c][0] + '"').join(', '));
+
     const alvo = tipo === 'atividades' ? estado.atividades : estado.resultados;
     const limp = tipo === 'atividades' ? CV.dados.limparAtividades(dados.linhas) : CV.dados.limparResultados(dados.linhas);
     // linhas repetidas dentro do próprio arquivo (mesmo ID) valem uma vez só
@@ -125,21 +191,29 @@
       alvo.set(r.id, r);
     }
     limp.limpas = Array.from(unicas.values());
-    const info = { nome: f.name, tipo, linhas: dados.linhas.length, validas: limp.limpas.length, novos, atualizados, repetidas, quando: new Date().toISOString(), descartes: limp.descartes };
+    const info = { nome, tipo, assinatura, linhas: dados.linhas.length, validas: limp.limpas.length, novos, atualizados, repetidas, quando: new Date().toISOString(), descartes: limp.descartes };
     estado.arquivos.push(info);
     await persistir(tipo === 'atividades' ? 'atividades' : 'resultados', limp.limpas, info);
 
-    const partes = [fmt.int(limp.limpas.length) + ' ' + (tipo === 'atividades' ? 'atividades' : 'retornos') + ' (' + fmt.int(novos) + ' novos, ' + fmt.int(atualizados) + ' já carregados antes e atualizados)'];
-    if (repetidas) partes.push(fmt.int(repetidas) + ' linha(s) repetida(s) no arquivo (mesmo ID) contadas uma vez só');
-    if (tipo === 'atividades') {
-      const ign = Object.values(limp.descartes.tipoIgnorado).reduce((a, b) => a + b, 0);
-      if (ign) partes.push(fmt.int(ign) + ' de outros tipos de serviço ignoradas');
-      if (limp.descartes.semData) partes.push(fmt.int(limp.descartes.semData) + ' sem data válida descartadas');
-    }
-    mensagem('ok', f.name + ': ' + partes.join(' · ') + '.');
+    const avisos = [];
     const novosCampos = dados.faltando.filter((c) => !obrig.includes(c));
-    if (novosCampos.length) mensagem('aviso', f.name + ': colunas opcionais ausentes (' + novosCampos.map((c) => campos[c][0]).join(', ') + ') — as análises que dependem delas ficam em branco.');
-    return true;
+    if (novosCampos.length) avisos.push(f.name + ': colunas opcionais ausentes (' + novosCampos.map((c) => campos[c][0]).join(', ') + ') — as análises que dependem delas ficam em branco.');
+    if (!emPasta) {
+      const partes = [fmt.int(limp.limpas.length) + ' ' + (tipo === 'atividades' ? 'atividades' : 'retornos') + ' (' + fmt.int(novos) + ' novos, ' + fmt.int(atualizados) + ' já carregados antes e atualizados)'];
+      if (repetidas) partes.push(fmt.int(repetidas) + ' linha(s) repetida(s) no arquivo (mesmo ID) contadas uma vez só');
+      if (tipo === 'atividades') {
+        const ign = Object.values(limp.descartes.tipoIgnorado).reduce((a, b) => a + b, 0);
+        if (ign) partes.push(fmt.int(ign) + ' de outros tipos de serviço ignoradas');
+        if (limp.descartes.semData) partes.push(fmt.int(limp.descartes.semData) + ' sem data válida descartadas');
+      }
+      mensagem('ok', f.name + ': ' + partes.join(' · ') + '.');
+    }
+    return { status: 'ok', tipo, avisos };
+  }
+
+  async function persistirInfo(info) {
+    if (!estado.persistente) return;
+    try { await CV.store.salvar('arquivos', [info]); } catch (e) { estado.persistente = false; }
   }
 
   async function persistir(store, registros, info) {
@@ -160,9 +234,85 @@
       for (const a of salvo.atividades) estado.atividades.set(a.id, a);
       for (const r of salvo.resultados) estado.resultados.set(r.id, r);
       estado.arquivos = (salvo.arquivos || []).sort((a, b) => (a.quando < b.quando ? -1 : 1));
+      const cfg = await CV.store.lerConfig('pasta');
+      if (cfg && cfg.handle) estado.pasta = { handle: cfg.handle, nome: cfg.nome || cfg.handle.name, ultima: cfg.ultima || null };
     } catch (e) {
       estado.persistente = false;
     }
+  }
+
+  // ---------------------------------------------------------------- pasta (OneDrive)
+
+  const temSeletorDePasta = () => typeof window.showDirectoryPicker === 'function';
+
+  async function guardarPasta(handle) {
+    estado.pasta = { handle, nome: handle.name, ultima: null };
+    try { await CV.store.salvarConfig('pasta', { handle, nome: handle.name, ultima: null }); } catch (e) { /* vale só nesta sessão */ }
+    atualizarBotoes();
+  }
+
+  /** O navegador lembra a pasta, mas o acesso precisa ser reconfirmado (1 clique) de vez em quando. */
+  async function permissaoDaPasta(pedir) {
+    const h = estado.pasta && estado.pasta.handle;
+    if (!h) return false;
+    const op = { mode: 'read' };
+    try {
+      if (!h.queryPermission) return true;
+      if ((await h.queryPermission(op)) === 'granted') return true;
+      if (pedir && h.requestPermission) return (await h.requestPermission(op)) === 'granted';
+    } catch (e) { /* trata como sem permissão */ }
+    return false;
+  }
+
+  async function lerPasta(silencioso) {
+    const h = estado.pasta.handle;
+    let lista;
+    try {
+      lista = await CV.pasta.listarHandle(h);
+    } catch (e) {
+      mensagem('erro', 'Não consegui abrir a pasta “' + estado.pasta.nome + '”: ' + (e && e.message ? e.message : 'erro desconhecido') + '. Ela foi movida, renomeada ou apagada? Use “Trocar pasta”.');
+      return;
+    }
+    await processarItens(lista.itens, { pasta: true, nomePasta: estado.pasta.nome, errosListagem: lista.erros, silencioso });
+    estado.pasta.ultima = new Date().toISOString();
+    try { await CV.store.salvarConfig('pasta', { handle: h, nome: estado.pasta.nome, ultima: estado.pasta.ultima }); } catch (e) { /* ok */ }
+    atualizarBotoes();
+    if (estado.cruzado) renderTudo();
+  }
+
+  /** Botão principal: escolhe a pasta (1ª vez) ou atualiza a pasta lembrada. */
+  async function cliquePasta() {
+    if (estado.pasta && temSeletorDePasta()) {
+      if (await permissaoDaPasta(true)) return lerPasta(false);
+      mensagem('aviso', 'Sem permissão para ler a pasta “' + estado.pasta.nome + '”. Clique em “Trocar pasta” e escolha-a novamente.');
+      return undefined;
+    }
+    return escolherPasta();
+  }
+
+  async function escolherPasta() {
+    if (!temSeletorDePasta()) { $('pasta').click(); return; } // Firefox/Safari: seletor simples, sem lembrar
+    let h;
+    try {
+      h = await window.showDirectoryPicker({ id: 'cadastro-venda', mode: 'read' });
+    } catch (e) {
+      if (e && e.name === 'AbortError') return; // o usuário cancelou
+      mensagem('erro', 'Não consegui abrir essa pasta: ' + (e && e.message ? e.message : 'erro desconhecido') + '. Se o navegador recusou por ser uma pasta do sistema, escolha a subpasta “Cadastro e Venda”.');
+      return;
+    }
+    await guardarPasta(h);
+    await lerPasta(false);
+  }
+
+  function atualizarBotoes() {
+    const p = estado.pasta;
+    const quando = p && p.ultima ? ' · lida em ' + new Date(p.ultima).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '';
+    const btn = $('btn-pasta');
+    btn.textContent = p && temSeletorDePasta() ? 'Atualizar pasta' : 'Carregar pasta';
+    btn.title = p ? 'Lê só as planilhas novas ou alteradas da pasta “' + p.nome + '”' + quando : 'Escolha a pasta (ex.: OneDrive › Cadastro e Venda) com as planilhas de Atividades e Resultados';
+    $('btn-trocar-pasta').hidden = !(p && temSeletorDePasta());
+    const grande = $('btn-escolher-pasta');
+    grande.textContent = p && temSeletorDePasta() ? 'Atualizar da pasta “' + p.nome + '”' : 'Escolher a pasta (OneDrive)';
   }
 
   async function limparTudo() {
@@ -173,6 +323,7 @@
     estado.arquivos = [];
     estado.cruzado = null;
     estado.jaTinhaDados = false;
+    if (estado.pasta) estado.pasta.ultima = null;
     $('mensagens').textContent = '';
     renderTudo();
   }
@@ -320,14 +471,16 @@
     $('app').hidden = !temDados;
     $('btn-exportar').hidden = !temDados;
     $('btn-limpar').hidden = !(temDados || estado.resultados.size);
-    $('btn-adicionar').textContent = temDados ? 'Adicionar arquivos' : 'Escolher arquivos';
+    atualizarBotoes();
     if (!temDados) {
       $('sub-topo').textContent = estado.resultados.size ? 'Faltam as atividades (planilha de Atividades/Cadastral) para cruzar.' : 'Nenhum dado carregado';
       return;
     }
     const nr = estado.resultados.size;
     $('sub-topo').textContent = `${fmt.int(estado.atividades.size)} atividades · ${fmt.int(nr)} retornos · visitas de ${fmt.longa(estado.datas.min)} a ${fmt.longa(estado.datas.max)}` +
-      (estado.cruzado.dataReferencia ? ` · último retorno em ${fmt.longa(estado.cruzado.dataReferencia)}` : '');
+      (estado.cruzado.dataReferencia ? ` · último retorno em ${fmt.longa(estado.cruzado.dataReferencia)}` : '') +
+      (estado.pasta && estado.pasta.ultima ? ` · pasta “${estado.pasta.nome}” lida em ${new Date(estado.pasta.ultima).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}` : '');
+    $('sub-topo').title = $('sub-topo').textContent;
     renderConteudo();
   }
 
@@ -732,7 +885,9 @@
     alvo.appendChild(h('p', { class: 'nota', text: 'Os retornos "fora das bases" são trabalho do backoffice sobre matrículas que não vieram destas bases de visita (demanda interna, outras regiões); por isso não entram na efetividade.' }));
 
     alvo.appendChild(h('h3', { text: 'Arquivos carregados' }));
-    if (estado.arquivos.length) {
+    const lidos = estado.arquivos.filter((a) => a.tipo !== 'ignorado');
+    const ignoradosPasta = estado.arquivos.length - lidos.length;
+    if (lidos.length) {
       alvo.appendChild(CV.ui.criarTabela({
         colunas: [
           colTxt('nome', 'Arquivo', (l) => l.nome),
@@ -743,9 +898,10 @@
           colNum('rep', 'Repetidas', (l) => l.repetidas || 0),
           colTxt('qdo', 'Carregado em', (l) => l.quando, { render: (l) => new Date(l.quando).toLocaleString('pt-BR') }),
         ],
-        linhas: estado.arquivos, ordem: { id: 'qdo', dir: 'desc' },
+        linhas: lidos, ordem: { id: 'qdo', dir: 'desc' },
       }));
     }
+    if (ignoradosPasta) alvo.appendChild(h('p', { class: 'nota', text: ignoradosPasta + ' outra(s) planilha(s) da pasta não são de Atividades nem de Resultados e foram ignoradas.' }));
     alvo.appendChild(h('div', { class: 'cabeca', style: { marginTop: '16px' } }, h('span', { class: 'espaco' }),
       h('button', { class: 'btn mini', text: 'Baixar cruzamento completo (CSV, com os filtros atuais)', on: { click: exportarCruzamento } })));
   }
@@ -781,9 +937,18 @@
 
   function ligarEntrada() {
     const input = $('arquivo');
+    const inputPasta = $('pasta');
     input.addEventListener('change', () => { receberArquivos(input.files); input.value = ''; });
+    inputPasta.addEventListener('change', () => {
+      const itens = CV.pasta.itensDeLista(inputPasta.files);
+      processarItens(itens, { pasta: true, nomePasta: CV.pasta.nomeDaPasta(itens) || 'selecionada' });
+      inputPasta.value = '';
+    });
     $('btn-adicionar').addEventListener('click', () => input.click());
     $('btn-escolher').addEventListener('click', () => input.click());
+    $('btn-pasta').addEventListener('click', cliquePasta);
+    $('btn-escolher-pasta').addEventListener('click', cliquePasta);
+    $('btn-trocar-pasta').addEventListener('click', escolherPasta);
     $('btn-exportar').addEventListener('click', exportarCruzamento);
     $('btn-limpar').addEventListener('click', limparTudo);
     let nivel = 0;
@@ -795,8 +960,32 @@
       e.preventDefault();
       nivel = 0;
       caixa.classList.remove('sobre');
-      if (e.dataTransfer && e.dataTransfer.files.length) receberArquivos(e.dataTransfer.files);
+      const dt = e.dataTransfer;
+      if (!dt) return;
+      // as entradas só valem durante o evento: captura tudo agora, de forma síncrona
+      const itens = Array.from(dt.items || []);
+      const handles = itens.map((i) => (i.getAsFileSystemHandle ? i.getAsFileSystemHandle() : null));
+      const entradas = itens.map((i) => (i.webkitGetAsEntry ? i.webkitGetAsEntry() : null)).filter(Boolean);
+      const arquivos = Array.from(dt.files || []);
+      if (entradas.some((en) => en.isDirectory)) soltouPasta(handles, entradas);
+      else if (arquivos.length) receberArquivos(arquivos);
     });
+  }
+
+  /** Pasta arrastada para a tela. No Chrome/Edge também dá para lembrá-la (handle). */
+  async function soltouPasta(handles, entradas) {
+    try {
+      const resolvidos = (await Promise.all(handles.map((h) => (h ? h.catch(() => null) : null)))).filter(Boolean);
+      const dirs = resolvidos.filter((h) => h.kind === 'directory');
+      if (dirs.length === 1 && entradas.filter((e) => e.isDirectory).length === 1 && resolvidos.length === 1) {
+        await guardarPasta(dirs[0]);
+        await lerPasta(false);
+        return;
+      }
+    } catch (e) { /* cai no caminho sem lembrar a pasta */ }
+    const r = await CV.pasta.listarEntradas(entradas);
+    const dir = entradas.find((e) => e.isDirectory);
+    await processarItens(r.itens, { pasta: true, nomePasta: dir ? dir.name : 'arrastada', errosListagem: r.erros });
   }
 
   async function iniciar() {
@@ -811,8 +1000,11 @@
       estado.jaTinhaDados = true;
       montarFiltros();
     }
+    atualizarBotoes();
     renderTudo();
     window.CV_estado = estado; // útil para depuração no console
+    // pasta lembrada e com acesso ainda válido: já traz o que for novo, sem precisar clicar
+    if (estado.pasta && temSeletorDePasta() && (await permissaoDaPasta(false))) await lerPasta(true);
   }
 
   iniciar();
