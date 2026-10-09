@@ -8,12 +8,19 @@
   'use strict';
   const CV = (global.CV = global.CV || {});
 
-  const NOME_BD = 'cadastro-venda';
+  let NOME_BD = 'cadastro-venda'; // cada página (interior, VCG) usa o seu banco: usarBanco()
   const VERSAO = 2;
   const STORES = { atividades: 'id', resultados: 'id', arquivos: 'seq' };
   const CONFIG = 'config'; // guarda a pasta escolhida (handle) e preferências
 
   let dbPromessa = null;
+
+  /** Escolhe o banco desta página (antes de qualquer leitura ou gravação). */
+  function usarBanco(nome) {
+    if (nome === NOME_BD) return;
+    NOME_BD = nome;
+    dbPromessa = null;
+  }
 
   function abrir() {
     if (dbPromessa) return dbPromessa;
@@ -103,6 +110,36 @@
     await transacao(db, [CONFIG], 'readwrite', (tx) => { tx.objectStore(CONFIG).delete(chave); });
   }
 
-  CV.store = { abrir, carregar, salvar, limpar, salvarConfig, lerConfig, apagarConfig };
+  /**
+   * Lê uma configuração de OUTRO banco (ex.: a pasta já escolhida na página do interior), sem
+   * criar nem alterar esse banco. Devolve null se ele não existe ou se o navegador não deixa.
+   */
+  async function lerConfigDe(nomeBanco, chave) {
+    try {
+      if (typeof indexedDB === 'undefined' || typeof indexedDB.databases !== 'function') return null;
+      const lista = await indexedDB.databases();
+      if (!lista.some((d) => d.name === nomeBanco)) return null;
+      const db = await new Promise((resolve, reject) => {
+        const r = indexedDB.open(nomeBanco);
+        r.onupgradeneeded = () => r.transaction.abort(); // não existia de verdade: não cria nada
+        r.onsuccess = () => resolve(r.result);
+        r.onerror = () => reject(r.error);
+      });
+      try {
+        if (!db.objectStoreNames.contains(CONFIG)) return null;
+        return await new Promise((resolve, reject) => {
+          const r = db.transaction([CONFIG], 'readonly').objectStore(CONFIG).get(chave);
+          r.onsuccess = () => resolve(r.result || null);
+          r.onerror = () => reject(r.error);
+        });
+      } finally {
+        db.close();
+      }
+    } catch (e) {
+      return null;
+    }
+  }
+
+  CV.store = { abrir, usarBanco, carregar, salvar, limpar, salvarConfig, lerConfig, lerConfigDe, apagarConfig };
   if (typeof module !== 'undefined' && module.exports) module.exports = CV.store;
 })(typeof window !== 'undefined' ? window : globalThis);

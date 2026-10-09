@@ -3,24 +3,24 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Cadastro e Venda Interior</title>
-  <meta name="description" content="Acompanhamento diário da efetividade das equipes de cadastro e venda: cruza as atividades visitadas com os retornos do backoffice pela matrícula.">
+  <title>Cadastro e Venda VCG</title>
+  <meta name="description" content="Acompanhamento diário da efetividade das equipes de cadastro e venda do VCG: cruza as atividades visitadas com o arquivo Resultados VCG pela matrícula.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%235064da'/%3E%3Cpath d='M9 22V15M16 22V10M23 22V13' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="css/app.css">
 </head>
-<body data-pagina="interior">
+<body data-pagina="vcg">
   <header class="topo">
     <div class="wrap">
       <div class="linha-topo">
         <div class="marca">
           <span class="logo" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><path d="M7 18v-6M12 18V6M17 18v-9"/></svg></span>
           <div>
-            <h1>Cadastro e Venda Interior</h1>
+            <h1>Cadastro e Venda VCG</h1>
             <small id="sub-topo">Nenhum dado carregado</small>
           </div>
         </div>
         <div class="acoes">
-          <a class="btn" id="btn-outra" href="vcg.html" title="Abre o painel das equipes do VCG (lê o arquivo Resultados VCG)">Painel VCG<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg></a>
+          <a class="btn" id="btn-outra" href="index.html" title="Volta ao painel do Interior"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5"/><path d="M11 6l-6 6 6 6"/></svg>Painel Interior</a>
           <button class="btn" id="btn-trocar-pasta" type="button" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Trocar pasta</button>
           <button class="btn primario" id="btn-pasta" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg><span id="rot-pasta">Carregar pasta</span></button>
           <button class="btn" id="btn-adicionar" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 20h16"/></svg>Adicionar arquivos</button>
@@ -42,16 +42,16 @@
   <main>
     <section id="vazio" class="vazio wrap">
       <div class="caixa" id="caixa">
-        <h2>Aponte a pasta com as planilhas</h2>
-        <p>Escolha a pasta (ex.: <b>OneDrive › Cadastro e Venda</b>). O app procura nela, inclusive nas subpastas, as planilhas de <b>Atividades</b> (alvos visitados) e de <b>Resultados</b> (retornos do backoffice), reconhece cada uma sozinho e cruza pela matrícula. Nas próximas vezes lê só o que for novo.</p>
+        <h2>Aponte a pasta com as planilhas do VCG</h2>
+        <p>Escolha a mesma pasta do painel Interior (ex.: <b>OneDrive › Cadastro e Venda</b>). Esta página lê as planilhas de <b>Atividades</b> (só das equipes <b>RIOVCGVENIN-001, -002 e -004</b>) e a de <b>Resultados</b> cujo nome tenha <b>“VCG”</b> (ex.: <b>Resultados VCG.xlsx</b>), e cruza pela matrícula. As outras planilhas de Resultados são do painel Interior e ficam de fora daqui. Nas próximas vezes lê só o que for novo.</p>
         <div class="acoes-vazio">
           <button class="btn primario" id="btn-escolher-pasta" type="button">Escolher a pasta (OneDrive)</button>
           <button class="btn" id="btn-escolher" type="button">ou escolher arquivos soltos</button>
         </div>
-        <p class="dica-vazio">Também dá para arrastar a pasta (ou as planilhas) para esta área. Use a pasta que o OneDrive sincroniza no seu computador. Arquivos com “VCG” no nome (ex.: Resultados VCG) são lidos só no painel VCG.</p>
+        <p class="dica-vazio">Também dá para arrastar a pasta (ou as planilhas) para esta área. Use a pasta que o OneDrive sincroniza no seu computador.</p>
         <div class="tipos">
           <div><b>Atividades</b><span>Exportação do sistema de campo ou a planilha "Cadastrais". Usa: Recurso, ID da Atividade, Matrícula, Data, Status, Observação (nome do projeto), Cidade, Início, Fim, Duração e Tempo de Deslocamento.</span></div>
-          <div><b>Resultados</b><span>Planilha do formulário do backoffice. Usa: Id, Hora de início, Matrícula s/ dígito, Frente de Serviço, Tipo de Ordem de Serviço, Alteração de Economia, DE/PARA, Tratativa Cadastral, Tipo de Alteração.</span></div>
+          <div><b>Resultados VCG</b><span>Planilha do formulário do backoffice, com “VCG” no nome. Usa: Id, Hora de início, Matrícula s/ dígito, Frente de Serviço, Tipo de Ordem de Serviço, Alteração de Economia, DE/PARA, Tratativa Cadastral, Tipo de Alteração.</span></div>
         </div>
         <p class="privacidade">Os arquivos são lidos aqui, no seu navegador. Nada é enviado para a internet. Os dados ficam guardados só neste computador, para você ir acrescentando um arquivo por dia.</p>
       </div>

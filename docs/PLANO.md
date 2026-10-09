@@ -23,13 +23,14 @@ Cruzamento: o retorno é lançado **depois** da visita (mediana de 1 dia), entã
 5. **Escopo fixo da operação:** 10 equipes e 12 cidades (`regras.js`); o que é de fora (outras equipes, São Gonçalo...) não entra nos números, mas continua ajudando a ligar os retornos.
 6. **Tempos das equipes em uma aba própria:** deslocamento, serviço, pausas/apoio e ociosidade por equipe, conferidos contra uma conta independente em Python. Só dias com a exportação completa (que traz refeição, DDS etc.) entram por padrão, para o almoço não virar ociosidade.
 7. **Exportação analítica em .xlsx:** o Excel recebe uma linha por atividade, com as colunas da planilha de Atividades e o cruzamento ao lado, para quem analisa filtrar e somar como preferir. O .xlsx é gerado no navegador por um escritor próprio (`js/xlsx-escrita.js`), conferido com openpyxl e LibreOffice.
-8. **"Novos alvos" = listas acionáveis e exportáveis**, não gráficos: revisitar, corrigir endereço, cobrar retorno, parar de insistir, onde atuar.
+8. **Duas páginas, um só código:** o painel do VCG (`vcg.html`) é o mesmo painel com outras equipes e outro arquivo de Resultados, escolhidos por `data-pagina` e `js/paginas.js`. Cada página tem o seu banco no navegador, e o arquivo com “VCG” no nome é lido só pela página VCG, para não misturar os retornos do VCG nos números do Interior. Evitou-se copiar o `app.js`: um ajuste nos painéis vale para os dois.
+9. **"Novos alvos" = listas acionáveis e exportáveis**, não gráficos: revisitar, corrigir endereço, cobrar retorno, parar de insistir, onde atuar.
 
 ## Como se garantiu a ausência de erros
 
 - **Leitor conferido célula a célula** contra openpyxl/pandas nos três arquivos reais (≈ 220 mil células, 0 divergências).
 - **Cruzamento e agregações reimplementados de forma independente em Python** (busca binária, outra lógica) e comparados visita a visita nos dados reais: 9.536 visitas, 0 divergências; 244 grupos de agregação (projeto, equipe, dia), 0 divergências; mesmos contadores de auditoria.
-- **88 testes automatizados** (`npm test`) com planilhas sintéticas, cada cenário de cruzamento com resultado calculado à mão: dois retornos da mesma matrícula, mesmo dia (ocorrência × executada), retorno antes da visita, fora da janela, protocolo no lugar da matrícula, matrícula inválida, frente de serviço, maturação, nome de projeto com encoding quebrado etc.
+- **96 testes automatizados** (`npm test`) com planilhas sintéticas, cada cenário de cruzamento com resultado calculado à mão: dois retornos da mesma matrícula, mesmo dia (ocorrência × executada), retorno antes da visita, fora da janela, protocolo no lugar da matrícula, matrícula inválida, frente de serviço, maturação, nome de projeto com encoding quebrado etc.
 - **A conta fecha na tela**: todo retorno cai em exatamente um balde na Auditoria; resultado + atualização + sem tratativa = com retorno; com retorno + sem retorno = executadas.
 - **Teste no navegador** (Chromium headless, `file://`): carga, recarga com persistência, recarga do mesmo arquivo sem duplicar, arquivo inválido, limpar dados, modo escuro, celular.
 

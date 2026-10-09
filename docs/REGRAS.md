@@ -47,7 +47,23 @@ O painel considera só as **10 equipes** e as **12 cidades** da operação (`esc
 - Atividades de outros tipos (refeição, DDS...) só são guardadas para equipes do escopo.
 - Lista vazia em `escopo` = sem filtro.
 
-## 1.2 Leitura de uma pasta
+## 1.2 As duas páginas (Interior e VCG)
+
+O mesmo código roda em duas páginas (`index.html` e `vcg.html`); o atributo `data-pagina` do `<body>` escolhe a configuração em [`js/paginas.js`](../js/paginas.js):
+
+| | Interior | VCG |
+|---|---|---|
+| Equipes | as 10 de `escopo` em `regras.js`, nas 12 cidades | `RIOVCGVENIN-001`, `-002` e `-004`, sem filtro de cidade |
+| Resultados lidos | qualquer planilha de Resultados, **menos** as com “VCG” no nome | **só** as com “VCG” no nome (ex.: `Resultados VCG.xlsx`) |
+| Atividades lidas | todas, **menos** as com “VCG” no nome | todas |
+| Atividades guardadas | visitas de qualquer equipe (servem para ligar o retorno) e os demais tipos só das equipes do escopo | só as das equipes do VCG |
+| Banco no navegador | `cadastro-venda` | `cadastro-venda-vcg` (separado) |
+
+“VCG no nome” vale para o nome do arquivo, sem as pastas, sem diferenciar maiúsculas. Um arquivo deixado de lado é anotado (para não ser reaberto toda vez) e aparece na mensagem de leitura e na Auditoria. O VCG aproveita a referência da pasta já escolhida no Interior; a permissão de leitura é pedida de novo, com um clique em **Atualizar**.
+
+Toda a análise (cruzamento por matrícula, janela de 30 dias, efetividade, tipos de resultado, tempos, novos alvos, exportação em Excel) é a mesma nas duas páginas. Para mudar as equipes do VCG, edite `escopo` do `vcg` em `js/paginas.js`.
+
+## 1.3 Leitura de uma pasta
 
 - Percorre a pasta e as subpastas (até 8 níveis), olhando só arquivos `.xlsx`. Ignora temporários do Excel (`~$...`), arquivos e pastas ocultos (que começam com `.`) e outros formatos.
 - **Reconhece o tipo pelo cabeçalho**, não pelo nome do arquivo: tem "ID da Atividade" e "Status da Atividade" → Atividades; tem "MATRICULA S/ DIGITO" (ou "Hora de início" + "Tipo de Ordem de Serviço") → Resultados. Qualquer outra planilha é ignorada e anotada, para não ser aberta de novo.
