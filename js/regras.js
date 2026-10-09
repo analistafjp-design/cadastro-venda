@@ -153,6 +153,7 @@
       { id: 'incremento', rotulo: 'Incremento de economia', curto: 'Incremento', grupo: 'resultado' },
       { id: 'categoria', rotulo: 'Alteração de categoria', curto: 'Categoria', grupo: 'resultado' },
       { id: 'venda', rotulo: 'Venda / ligação nova', curto: 'Venda', grupo: 'resultado' },
+      { id: 'novo_cliente', rotulo: 'Novo cliente (lote não cadastrado)', curto: 'Novo cliente', grupo: 'resultado' },
       { id: 'titularidade', rotulo: 'Troca de titularidade', curto: 'Titularidade', grupo: 'resultado' },
       { id: 'tarifa_social', rotulo: 'Tarifa social', curto: 'Tarifa social', grupo: 'resultado' },
       { id: 'fatura', rotulo: 'Fatura digital / forma de entrega', curto: 'Fatura digital', grupo: 'resultado' },

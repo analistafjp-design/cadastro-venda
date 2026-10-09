@@ -193,7 +193,8 @@
     const buf = await f.arrayBuffer();
     const cab = await CV.xlsx.lerPlanilha(buf, { soCabecalho: true });
     const tipo = CV.dados.detectarTipo(cab.cabecalho);
-    const motivoTipo = tipo ? PAG.recusa(item.caminho, tipo) : null;
+    const layout = tipo === 'resultados' ? CV.dados.layoutResultados(cab.cabecalho) : null;
+    const motivoTipo = tipo ? PAG.recusa(item.caminho, tipo, layout) : null;
     if (motivoTipo) return recusar(motivoTipo);
     if (!tipo) {
       if (!emPasta) {
@@ -205,8 +206,9 @@
       await persistirInfo(info);
       return { status: 'ignorado', avisos: [] };
     }
-    const campos = tipo === 'atividades' ? CV.dados.CAMPOS_ATIVIDADES : CV.dados.CAMPOS_RESULTADOS;
-    const obrig = tipo === 'atividades' ? CV.dados.OBRIGATORIOS_ATIVIDADES : CV.dados.OBRIGATORIOS_RESULTADOS;
+    const vcg = layout === 'vcg';
+    const campos = tipo === 'atividades' ? CV.dados.CAMPOS_ATIVIDADES : vcg ? CV.dados.CAMPOS_RESULTADOS_VCG : CV.dados.CAMPOS_RESULTADOS;
+    const obrig = tipo === 'atividades' ? CV.dados.OBRIGATORIOS_ATIVIDADES : vcg ? CV.dados.OBRIGATORIOS_RESULTADOS_VCG : CV.dados.OBRIGATORIOS_RESULTADOS;
     const dados = await CV.xlsx.lerPlanilha(buf, {
       colunas: campos,
       aoProgresso: (n) => ov.texto('Lendo ' + f.name + ' — ' + fmt.int(n) + ' linhas…'),
@@ -215,7 +217,7 @@
     if (faltam.length) throw new Error('não encontrei a(s) coluna(s) ' + faltam.map((c) => '"' + campos[c][0] + '"').join(', '));
 
     const alvo = tipo === 'atividades' ? estado.atividades : estado.resultados;
-    const limp = tipo === 'atividades' ? CV.dados.limparAtividades(dados.linhas, { soEscopo: PAG.soEscopo }) : CV.dados.limparResultados(dados.linhas);
+    const limp = tipo === 'atividades' ? CV.dados.limparAtividades(dados.linhas, { soEscopo: PAG.soEscopo }) : CV.dados.limparResultados(dados.linhas, layout);
     // linhas repetidas dentro do próprio arquivo (mesmo ID) valem uma vez só
     const unicas = new Map();
     for (const r of limp.limpas) unicas.set(r.id, r);
@@ -633,6 +635,13 @@
           ? ['Coloque na pasta o arquivo ', h('b', { text: 'Resultados VCG' }), ' (o nome precisa ter “VCG”) e clique em ', h('b', { text: 'Atualizar' }), '. Sem ele, só aparecem as visitas e os tempos.']
           : 'Coloque a planilha de Resultados na pasta e clique em Atualizar. Sem ela, só aparecem as visitas e os tempos.'));
     }
+    if (estado.aba === 'visao' && estado.resultados.size && estado.cruzado && estado.cruzado.auditoria.atribuidos === 0 && estado.visitas.length) {
+      // há retornos, mas nenhum caiu numa visita: quase sempre é falta de atividades de outros dias
+      const ex = Array.from(estado.atividades.values()).filter((a) => CV.escopo.equipeNoEscopo(a.recurso)).map((a) => a.data).filter(Boolean).sort();
+      alvo.appendChild(h('p', { class: 'explica' }, h('b', { text: 'Nenhum retorno foi ligado a uma visita. ' }),
+        'Há ' + fmt.int(estado.resultados.size) + ' lançamento(s) de Resultados, mas as atividades carregadas das equipes' + (ex.length ? ' vão só de ' + fmt.longa(ex[0]) + ' a ' + fmt.longa(ex[ex.length - 1]) : '') +
+        '. Coloque na pasta os arquivos de Atividades dos outros dias e clique em Atualizar. A aba Auditoria mostra, equipe por equipe, o que foi conferido.'));
+    }
     const semDado = estado.aba === 'tempos' ? !estado.agenda.length && !estado.visitas.length : !estado.visitas.length;
     if (semDado && estado.aba !== 'auditoria') {
       alvo.appendChild(h('p', { class: 'explica' },
@@ -643,7 +652,7 @@
     }
     if (estado.aba === 'visao') {
       CV.ui.renderVisao(alvo, {
-        vs: visitasFiltradas(), equipes: equipesVisiveis(), gran: granularidadeAtual(), ordemDe, abertas: estado.abertas,
+        vs: visitasFiltradas(), equipes: equipesVisiveis(), gran: granularidadeAtual(), ordemDe, abertas: estado.abertas, vcg: PAG.id === 'vcg',
         aoMudarGran: (g) => { estado.gran = g; estado.granManual = true; renderPainel(); },
       });
     } else if (estado.aba === 'tempos') {
@@ -978,6 +987,7 @@
       ['Retornos carregados', a.retornosTotal],
       ['Atribuídos a uma visita', a.atribuidos],
       ['Matrícula fora das bases visitadas', a.foraDasBases],
+      ['Matrícula visitada só por outra equipe (o lançamento é de outra)', a.outraEquipe],
       ['Anteriores à primeira visita da matrícula', a.anteriorVisita],
       ['Depois da janela de ' + estado.janela + ' dias', a.foraJanela],
       ['Matrícula inválida (não é 9 dígitos)', a.matriculaInvalida],
@@ -985,6 +995,32 @@
       ['Frente de serviço desconsiderada', a.frenteIgnorada],
     ])));
     alvo.appendChild(h('p', { class: 'nota', text: 'Os retornos "fora das bases" são trabalho do backoffice sobre matrículas que não vieram destas bases de visita (demanda interna, outras regiões); por isso não entram na efetividade.' }));
+
+    // ---- lançamentos do formulário (que dizem a equipe) × atividades
+    const lancamentos = Array.from(estado.resultados.values());
+    if (lancamentos.some((r) => r.equipe)) {
+      const cf = M.conferirLancamentos(lancamentos, Array.from(estado.atividades.values()), estado.janela);
+      alvo.appendChild(h('h3', { text: 'Lançamentos do formulário × atividades das equipes' }));
+      const colunas = [
+        colTxt('eq', 'Equipe', (l) => l.equipe),
+        colNum('lan', 'Lançados', (l) => l.lancados, { dica: 'Lançamentos do formulário que dizem ser desta equipe' }),
+        colNum('exe', 'OS executada pela equipe', (l) => l.executada, { dica: 'Há atividade FINALIZADA da mesma equipe, com a mesma matrícula, até ' + estado.janela + ' dias antes do lançamento' }),
+        colNum('nex', 'Só tentativa', (l) => l.naoExecutada, { dica: 'Atividade da mesma equipe na janela, mas sem nenhuma finalizada (ocorrência, paralisada, cancelada...)' }),
+        colNum('fj', 'Atividade fora da janela', (l) => l.foraJanela, { dica: 'A equipe tem atividade com essa matrícula, mas depois do lançamento ou há mais de ' + estado.janela + ' dias' }),
+        colNum('oe', 'Só de outra equipe', (l) => l.outraEquipe, { dica: 'A matrícula só tem atividade de outra equipe do painel' }),
+        colNum('sem', 'Sem atividade carregada', (l) => l.sem, { dica: 'A matrícula não aparece nas atividades carregadas' }),
+      ];
+      const soma = (k) => cf.porEquipe.reduce((s, l) => s + l[k], 0);
+      alvo.appendChild(CV.ui.criarTabela({
+        colunas, linhas: cf.porEquipe, ordem: { id: 'eq', dir: 'asc' },
+        total: { equipe: 'Total', ehTotal: true, lancados: soma('lancados'), executada: soma('executada'), naoExecutada: soma('naoExecutada'), foraJanela: soma('foraJanela'), outraEquipe: soma('outraEquipe'), sem: soma('sem') },
+      }));
+      const cob = cf.atividades.n
+        ? 'Atividades das equipes do painel carregadas: ' + fmt.int(cf.atividades.n) + ', de ' + fmt.longa(cf.atividades.min) + ' a ' + fmt.longa(cf.atividades.max) + ' (' + fmt.int(cf.atividades.dias) + ' dia(s) com atividade).'
+        : 'Nenhuma atividade das equipes do painel foi carregada.';
+      alvo.appendChild(h('p', { class: 'nota', text: cob + ' Para cada lançamento, procuro atividade da MESMA equipe com a mesma matrícula, até ' + estado.janela + ' dias antes dele. “Sem atividade carregada” quer dizer que a matrícula não aparece nos arquivos de Atividades já lidos: coloque na pasta os arquivos dos outros dias para o cruzamento completar.' }));
+      if (cf.foraEscopo.length) alvo.appendChild(h('p', { class: 'nota', text: 'Lançados por equipes fora do painel (não entram nas contas): ' + cf.foraEscopo.map(([e, n]) => e + ' (' + fmt.int(n) + ')').join(', ') + '.' }));
+    }
 
     // ---- tipos de atividade (tempos)
     const tipos = CV.tempos.tiposPresentes(estado.agenda);

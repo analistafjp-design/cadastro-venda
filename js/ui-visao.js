@@ -70,7 +70,16 @@
       cartao('Total alteração de categoria', fmt.int(c.totalCat), 'var(--c-verde)', 'Alteração de categoria (inclui a que veio com incremento)'),
       cartao('Troca de titularidade', fmt.int(c.titular), 'var(--c-laranja)', 'Troca de titular da matrícula'),
     ];
-    if (c.outros > 0) tipos.push(cartao('Outros resultados', fmt.int(c.outros), 'var(--c-claro)', 'Tarifa social, fatura digital, venda, negociação de débitos, decremento...'));
+    if (ctx.vcg) {
+      // no VCG a venda e o cliente novo são o que mais importa: cada um tem o seu card
+      tipos.push(
+        cartao('Venda factível', fmt.int(c.venda), 'var(--c-verde)', 'Venda registrada no formulário (Venda Factível)'),
+        cartao('Novo cliente (lote não cadastrado)', fmt.int(c.novo), 'var(--c-azul)', 'Lote que não estava no cadastro e virou cliente novo'),
+        cartao('Negociação de débitos', fmt.int(c.debitos), 'var(--c-claro)', 'Negociação, unificação ou reparcelamento de débitos')
+      );
+    } else if (c.outros > 0) {
+      tipos.push(cartao('Outros resultados', fmt.int(c.outros), 'var(--c-claro)', 'Tarifa social, fatura digital, venda, negociação de débitos, decremento...'));
+    }
     alvo.appendChild(h('div', { class: 'cartoes' }, tipos));
 
     // ------------------------------------------------------------- Bases

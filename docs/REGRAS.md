@@ -63,6 +63,28 @@ O mesmo código roda em duas páginas (`index.html` e `vcg.html`); o atributo `d
 
 Toda a análise (cruzamento por matrícula, janela de 30 dias, efetividade, tipos de resultado, tempos, novos alvos, exportação em Excel) é a mesma nas duas páginas. Para mudar as equipes do VCG, edite `escopo` do `vcg` em `js/paginas.js`.
 
+### Resultados VCG (formulário do VCG)
+
+Cabeçalho: `Id`, `Hora de início`, `Hora de conclusão`, `Email`, `Nome`, `DATA:`, `Matrícula`, `Bairro`, `Equipe`, `Atualização realizada`, `Quantas economias adicionadas`, `Categoria adicionada`, `Observação`. É reconhecido por ter **Equipe** e **Atualização realizada** (e a Matrícula pode vir com espaço invisível no fim). Não há número de OS, de protocolo nem ID de atividade: a ligação com as Atividades é por **matrícula + equipe + data**.
+
+- **Data do lançamento**: `DATA:` quando preenchida (lançamento atrasado); senão a `Hora de início`.
+- **Classificação** (`classificarVcg`, em `js/resultados.js`): a *Atualização realizada* diz o que foi feito e a *Observação* desempata (às vezes escolhem a opção genérica e explicam no texto).
+
+| Atualização realizada | Vira | Grupo |
+|---|---|---|
+| Venda Factível (ou "venda" na observação) | Venda | resultado |
+| Lote não cadastrado - Novo cliente | Novo cliente (lote não cadastrado) — ou Titularidade/Venda se a observação disser | resultado |
+| Incremento de economia; Ajuste/Atualização de economia com economia acrescentada | Incremento de economia | resultado |
+| Ajuste de economia com "retirado/remoção/desmembramento" | Decremento | resultado |
+| Alteração de Categoria | Categoria (+ Incremento se a observação falar em incremento) | resultado |
+| Troca de Titularidade | Titularidade | resultado |
+| Negociação | Negociação de débitos | resultado |
+| E-mail (quando a observação fala em fatura) | Fatura | resultado |
+| Nome do Bairro, Telefone, Endereço, Nº de Porta, E-mail, Atualização de Contato... | Atualização cadastral | não é resultado |
+
+- **Atribuição à visita** (diferente do Resultados de sempre): como o lançamento traz a equipe, só vale a visita **da mesma equipe**; se a matrícula só foi visitada por outra, o lançamento vai para o balde “visitada só por outra equipe” na Auditoria.
+- **Conferência na Auditoria** (“Lançamentos do formulário × atividades das equipes”): para cada equipe do painel, quantos lançamentos têm *OS executada pela equipe* (atividade finalizada, mesma matrícula, até 30 dias antes), *só tentativa* (ocorrência, paralisada ou cancelada), *atividade fora da janela*, *só de outra equipe* ou *sem atividade carregada* (a matrícula não aparece nos arquivos de Atividades já lidos).
+
 ## 1.3 Leitura de uma pasta
 
 - Percorre a pasta e as subpastas (até 8 níveis), olhando só arquivos `.xlsx`. Ignora temporários do Excel (`~$...`), arquivos e pastas ocultos (que começam com `.`) e outros formatos.

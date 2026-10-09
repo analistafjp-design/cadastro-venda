@@ -53,6 +53,23 @@
   };
   const OBRIGATORIOS_RESULTADOS = ['id', 'mat', 'inicio'];
 
+  // Formulário "Resultados VCG": o próprio lançamento diz a equipe e o que foi atualizado.
+  const CAMPOS_RESULTADOS_VCG = {
+    id: ['Id'],
+    inicio: ['Hora de início'],
+    fim: ['Hora de conclusão'],
+    dataInformada: ['DATA:'],
+    mat: ['Matrícula'],
+    bairro: ['Bairro'],
+    equipe: ['Equipe'],
+    atualizacao: ['Atualização realizada'],
+    qtdEcon: ['Quantas economias adicionadas'],
+    categoria: ['Categoria adicionada'],
+    obs: ['Observação'],
+    nome: ['Nome'],
+  };
+  const OBRIGATORIOS_RESULTADOS_VCG = ['id', 'mat', 'inicio', 'equipe', 'atualizacao'];
+
   const ROTULOS = {
     id: 'ID', mat: 'Matrícula', data: 'Data', recurso: 'Recurso', status: 'Status da Atividade', inicio: 'Hora de início',
   };
@@ -62,7 +79,14 @@
     const k = new Set(cabecalho.map((h) => N().chaveCabecalho(h)));
     if (k.has('iddaatividade') && k.has('statusdaatividade')) return 'atividades';
     if (k.has('matriculasdigito') || (k.has('horadeinicio') && k.has('tipodeordemdeservico'))) return 'resultados';
+    if (k.has('atualizacaorealizada') && k.has('equipe') && k.has('matricula')) return 'resultados';
     return null;
+  }
+
+  /** Qual formulário é a planilha de Resultados: 'vcg' (com Equipe e "Atualização realizada") ou 'padrao'. */
+  function layoutResultados(cabecalho) {
+    const k = new Set(cabecalho.map((h) => N().chaveCabecalho(h)));
+    return k.has('atualizacaorealizada') && k.has('equipe') && !k.has('matriculasdigito') ? 'vcg' : 'padrao';
   }
 
   function cortar(s, n) {
@@ -186,7 +210,37 @@
 
   // ---------- resultados ----------
 
-  function limparResultado(r) {
+  /** Primeiro número de um texto ("1", "Foi acrescentada mais 1 economia" -> 1); null se não houver. */
+  function primeiroNumero(v) {
+    if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+    const m = /\d+/.exec(String(v === null || v === undefined ? '' : v));
+    return m ? Number(m[0]) : null;
+  }
+
+  function limparResultadoVcg(r) {
+    const mat = N().matricula(r.mat);
+    const id = N().texto(r.id);
+    return {
+      id: id === null ? null : String(id).replace(/\.0+$/, ''),
+      layout: 'vcg',
+      // "DATA:" é a data que o backoffice informou (lançamentos atrasados); sem ela vale a hora do lançamento
+      data: N().data(r.dataInformada) || N().data(r.inicio) || N().data(r.fim),
+      mat: mat.mat,
+      matBruta: mat.bruto,
+      frente: 'VCG',
+      equipe: N().texto(r.equipe),
+      atualizacao: cortar(N().texto(r.atualizacao), 80),
+      obs: cortar(N().texto(r.obs), 160),
+      qtdEcon: primeiroNumero(r.qtdEcon),
+      categoria: cortar(N().texto(r.categoria), 40),
+      bairro: N().texto(r.bairro),
+      nome: N().texto(r.nome),
+      tipoOS: null, econ: null, de: null, para: null, tratativa: null, tipoAlt: null,
+    };
+  }
+
+  function limparResultado(r, layout) {
+    if (layout === 'vcg') return limparResultadoVcg(r);
     const mat = N().matricula(r.mat);
     return {
       id: N().texto(r.id) === null ? null : String(r.id).replace(/\.0+$/, ''),
@@ -203,11 +257,11 @@
     };
   }
 
-  function limparResultados(linhas) {
+  function limparResultados(linhas, layout) {
     const descartes = { semId: 0 };
     const limpas = [];
     for (const raw of linhas) {
-      const x = limparResultado(raw);
+      const x = limparResultado(raw, layout);
       if (!x.id) { descartes.semId++; continue; }
       limpas.push(x);
     }
@@ -215,11 +269,12 @@
   }
 
   function derivarResultados(limpas) {
-    return limpas.map((x) => Object.assign({}, x, CV.resultados.classificar(x)));
+    return limpas.map((x) => Object.assign({}, x, x.layout === 'vcg' ? CV.resultados.classificarVcg(x) : CV.resultados.classificar(x)));
   }
 
   CV.dados = {
     CAMPOS_ATIVIDADES, OBRIGATORIOS_ATIVIDADES, CAMPOS_RESULTADOS, OBRIGATORIOS_RESULTADOS, ROTULOS,
+    CAMPOS_RESULTADOS_VCG, OBRIGATORIOS_RESULTADOS_VCG, layoutResultados, primeiroNumero,
     detectarTipo, limparAtividades, derivarVisitas, limparResultados, derivarResultados,
     qtdEconomias, rotuloQtdEcon, grupoStatus, tipoEquipe, ehCadastral,
   };
