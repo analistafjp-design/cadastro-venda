@@ -124,7 +124,7 @@
         celulaTaxa(e.taxa, maxTaxa)));
       corpo.appendChild(linhaServicos);
     }
-    const blocoEq = bloco('Resultado por equipe', 'Só as equipes que trouxeram resultado no período, do cadastro (RIORECIN) e da venda (RIOVENIN). Use o “+” sob o nome para abrir os serviços e as quantidades.');
+    const blocoEq = bloco('Resultado por equipe', 'Só as equipes que trouxeram resultado no período. Use o “+” sob o nome para abrir os serviços e as quantidades.');
     if (equipes.length) {
       blocoEq.appendChild(h('div', { class: 'tabela-wrap' }, h('table', { class: 'tab' },
         h('thead', null, h('tr', null,

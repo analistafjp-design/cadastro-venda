@@ -11,6 +11,12 @@
   const { h, fmt } = CV.ui;
   const $ = (id) => document.getElementById(id);
 
+  // Esta é a página do interior ou a do VCG (<body data-pagina>): muda o escopo, o banco no
+  // navegador e quais arquivos da pasta cada uma lê (js/paginas.js).
+  const PAG = CV.paginas.atual();
+  if (PAG.escopo) R.escopo = PAG.escopo;
+  CV.store.usarBanco(PAG.banco);
+
   // Muda quando a leitura das planilhas passa a guardar mais coisas (ex.: horários): os dados
   // antigos do navegador são descartados e relidos da pasta.
   const VERSAO_DADOS = 2;
@@ -113,7 +119,7 @@
     }
 
     const ov = sobreposicao('Lendo arquivos…');
-    const cont = { atividades: 0, resultados: 0, ignorados: [], avisos: new Set() };
+    const cont = { atividades: 0, resultados: 0, ignorados: [], recusados: [], avisos: new Set() };
     let mudou = false;
     try {
       for (let i = 0; i < fila.length; i++) {
@@ -125,6 +131,7 @@
           const r = await carregarArquivo(it, ov, pasta);
           if (r.status === 'ok') { mudou = true; cont[r.tipo]++; r.avisos.forEach((a) => cont.avisos.add(a)); }
           else if (r.status === 'ignorado') cont.ignorados.push(it.caminho);
+          else if (r.status === 'recusado') cont.recusados.push({ caminho: it.caminho, motivo: r.motivo });
         } catch (e) {
           console.error(e);
           falhas.push({ caminho: it.caminho, msg: e && e.message ? e.message : 'não consegui ler este arquivo.' });
@@ -148,10 +155,19 @@
       t += partes.length ? ' — lidas ' + partes.join(' e ') : ' — nenhuma é de Atividades ou Resultados';
       if (plano.pulados) t += '; ' + plano.pulados + ' já lida(s) antes (puladas)';
       if (cont.ignorados.length) t += '; ' + cont.ignorados.length + ' não é/são Atividades nem Resultados (ignorada(s): ' + cont.ignorados.slice(0, 3).map((c) => c.split('/').pop()).join(', ') + (cont.ignorados.length > 3 ? '…' : '') + ')';
+      if (cont.recusados.length) t += '; ' + textoRecusados(cont.recusados);
       mensagem(partes.length ? 'ok' : 'aviso', t + '.');
+    } else if (cont.recusados.length) {
+      mensagem('aviso', 'Não li ' + textoRecusados(cont.recusados) + '.');
     }
     for (const a of cont.avisos) mensagem('aviso', a);
     if (falhas.length) mensagem('erro', textoFalhas(falhas));
+  }
+
+  /** "2 arquivo(s) deixado(s) de lado (X.xlsx: motivo...)". */
+  function textoRecusados(lista) {
+    const ex = lista.slice(0, 2).map((r) => r.caminho.split('/').pop() + ': ' + r.motivo).join('; ');
+    return lista.length + ' arquivo(s) deixado(s) de lado nesta página (' + ex + (lista.length > 2 ? '…' : '') + ')';
   }
 
   function textoFalhas(falhas) {
@@ -165,9 +181,20 @@
     const f = item.file;
     const nome = emPasta ? item.caminho : f.name;
     const assinatura = CV.pasta.assinatura(item);
+    // arquivo que é da outra página: anota (para não reabrir toda vez) e segue
+    const recusar = async (motivo) => {
+      const info = { nome, tipo: 'ignorado', motivo, assinatura, quando: new Date().toISOString() };
+      estado.arquivos.push(info);
+      await persistirInfo(info);
+      return { status: 'recusado', motivo, avisos: [] };
+    };
+    const motivoNome = PAG.recusa(item.caminho, null);
+    if (motivoNome) return recusar(motivoNome);
     const buf = await f.arrayBuffer();
     const cab = await CV.xlsx.lerPlanilha(buf, { soCabecalho: true });
     const tipo = CV.dados.detectarTipo(cab.cabecalho);
+    const motivoTipo = tipo ? PAG.recusa(item.caminho, tipo) : null;
+    if (motivoTipo) return recusar(motivoTipo);
     if (!tipo) {
       if (!emPasta) {
         throw new Error('não reconheci o formato. Esperava a planilha de Atividades (com "ID da Atividade", "Matrícula", "Status da Atividade") ou a de Resultados (com "MATRICULA S/ DIGITO", "Hora de início").');
@@ -188,7 +215,7 @@
     if (faltam.length) throw new Error('não encontrei a(s) coluna(s) ' + faltam.map((c) => '"' + campos[c][0] + '"').join(', '));
 
     const alvo = tipo === 'atividades' ? estado.atividades : estado.resultados;
-    const limp = tipo === 'atividades' ? CV.dados.limparAtividades(dados.linhas) : CV.dados.limparResultados(dados.linhas);
+    const limp = tipo === 'atividades' ? CV.dados.limparAtividades(dados.linhas, { soEscopo: PAG.soEscopo }) : CV.dados.limparResultados(dados.linhas);
     // linhas repetidas dentro do próprio arquivo (mesmo ID) valem uma vez só
     const unicas = new Map();
     for (const r of limp.limpas) unicas.set(r.id, r);
@@ -251,7 +278,15 @@
         estado.arquivos = (salvo.arquivos || []).sort((a, b) => (a.quando < b.quando ? -1 : 1));
       }
       if (!versao || versao.v !== VERSAO_DADOS) await CV.store.salvarConfig('versaoDados', { v: VERSAO_DADOS });
-      const cfg = await CV.store.lerConfig('pasta');
+      let cfg = await CV.store.lerConfig('pasta');
+      if (!(cfg && cfg.handle) && PAG.herdaPastaDe) {
+        // primeira vez nesta página: aproveita a pasta já escolhida na outra (só a referência; a permissão é pedida no "Atualizar")
+        const outra = await CV.store.lerConfigDe(PAG.herdaPastaDe, 'pasta');
+        if (outra && outra.handle) {
+          cfg = { handle: outra.handle, nome: outra.nome || outra.handle.name, ultima: null };
+          try { await CV.store.salvarConfig('pasta', cfg); } catch (e) { /* vale só nesta sessão */ }
+        }
+      }
       if (cfg && cfg.handle) estado.pasta = { handle: cfg.handle, nome: cfg.nome || cfg.handle.name, ultima: cfg.ultima || null };
     } catch (e) {
       estado.persistente = false;
@@ -543,7 +578,7 @@
   // ---------------------------------------------------------------- render
 
   function renderTudo() {
-    const temDados = !!(estado.cruzado && estado.cruzado.visitas.length);
+    const temDados = !!(estado.cruzado && (estado.cruzado.visitas.length || estado.agenda.length));
     $('vazio').hidden = temDados;
     $('app').hidden = !temDados;
     $('abas').hidden = !temDados;
@@ -591,10 +626,19 @@
   function renderPainel() {
     const alvo = $('painel');
     alvo.textContent = '';
-    if (!estado.visitas.length && estado.aba !== 'auditoria') {
+    if (!estado.resultados.size && estado.aba !== 'auditoria') {
+      // sem a planilha de Resultados não há o que cruzar: avisa o que falta nesta página
+      alvo.appendChild(h('p', { class: 'explica' }, h('b', { text: 'Ainda não há retornos do backoffice. ' }),
+        PAG.id === 'vcg'
+          ? ['Coloque na pasta o arquivo ', h('b', { text: 'Resultados VCG' }), ' (o nome precisa ter “VCG”) e clique em ', h('b', { text: 'Atualizar' }), '. Sem ele, só aparecem as visitas e os tempos.']
+          : 'Coloque a planilha de Resultados na pasta e clique em Atualizar. Sem ela, só aparecem as visitas e os tempos.'));
+    }
+    const semDado = estado.aba === 'tempos' ? !estado.agenda.length && !estado.visitas.length : !estado.visitas.length;
+    if (semDado && estado.aba !== 'auditoria') {
       alvo.appendChild(h('p', { class: 'explica' },
-        'Nenhuma visita das equipes e cidades da operação nos arquivos carregados. Veja na aba ', h('b', { text: 'Auditoria' }),
-        ' o que ficou de fora; as equipes e as cidades consideradas ficam em ', h('code', { text: 'escopo' }), ' no arquivo ', h('code', { text: 'js/regras.js' }), '.'));
+        PAG.id === 'vcg' ? 'Nenhuma atividade das equipes do VCG nos arquivos carregados. ' : 'Nenhuma visita das equipes e cidades da operação nos arquivos carregados. ',
+        'Veja na aba ', h('b', { text: 'Auditoria' }),
+        ' o que ficou de fora; as equipes consideradas ficam em ', h('code', { text: 'escopo' }), ' no arquivo ', h('code', { text: PAG.id === 'vcg' ? 'js/paginas.js' : 'js/regras.js' }), '.'));
       return;
     }
     if (estado.aba === 'visao') {
@@ -663,19 +707,19 @@
 
   /** Visão geral e Auditoria: as visitas do recorte, uma linha por atividade. */
   function exportarCruzamento() {
-    return baixarExcel('visitas_' + periodoTxt(), [CV.exporta.abaVisitas(visitasFiltradas()), CV.exporta.abaFiltros(descricaoFiltros(true))]);
+    return baixarExcel(PAG.prefixoArquivo + 'visitas_' + periodoTxt(), [CV.exporta.abaVisitas(visitasFiltradas()), CV.exporta.abaFiltros(descricaoFiltros(true))]);
   }
 
   /** Tempos: um dia de cada equipe e as atividades com horário. */
   function exportarTempos() {
     const ag = agendaFiltrada();
-    return baixarExcel('tempos-equipes_' + periodoTxt(), [CV.exporta.abaDias(ag), CV.exporta.abaAgenda(ag), CV.exporta.abaFiltros(descricaoFiltros(false))]);
+    return baixarExcel(PAG.prefixoArquivo + 'tempos-equipes_' + periodoTxt(), [CV.exporta.abaDias(ag), CV.exporta.abaAgenda(ag), CV.exporta.abaFiltros(descricaoFiltros(false))]);
   }
 
   /** Listas de novos alvos: a última atividade de cada alvo (formato Atividades) mais o que a lista calcula. */
   function exportarLista(nome, linhas, extras) {
     const aba = CV.exporta.abaVisitas(linhas, { visitaDe: (l) => l.visita, extras });
-    return baixarExcel(nome + '_' + hojeTxt(), [aba, CV.exporta.abaFiltros(descricaoFiltros(true))]);
+    return baixarExcel(PAG.prefixoArquivo + nome + '_' + hojeTxt(), [aba, CV.exporta.abaFiltros(descricaoFiltros(true))]);
   }
 
   function exportarAtual() {
@@ -905,7 +949,7 @@
     if (foraEquipe.size) notas.push('Equipes de fora com mais visitas: ' + topo(foraEquipe, 5) + '.');
     if (foraCidade.size) notas.push('Cidades de fora com mais visitas: ' + topo(foraCidade, 5) + '.');
     if (notas.length) alvo.appendChild(h('p', { class: 'nota', text: notas.join(' ') }));
-    alvo.appendChild(h('p', { class: 'nota', text: 'Equipes e cidades do painel: ' + R.escopo.equipes.join(', ') + '. As cidades e as equipes ficam em js/regras.js (escopo). As visitas de fora continuam servindo para ligar os retornos pela matrícula, só não aparecem nos números.' }));
+    alvo.appendChild(h('p', { class: 'nota', text: 'Equipes do painel: ' + R.escopo.equipes.join(', ') + '. ' + (R.escopo.cidades.length ? 'Só as cidades da operação. ' : 'Sem filtro de cidade. ') + (PAG.soEscopo ? 'As atividades de outras equipes nem são guardadas nesta página.' : 'As visitas de fora continuam servindo para ligar os retornos pela matrícula, só não aparecem nos números.') + ' O escopo fica em js/regras.js (interior) e js/paginas.js (VCG).' }));
 
     alvo.appendChild(h('h3', { text: 'Atividades' }));
     const proj = c.projetos;
@@ -960,7 +1004,8 @@
 
     alvo.appendChild(h('h3', { text: 'Arquivos carregados' }));
     const lidos = estado.arquivos.filter((x) => x.tipo !== 'ignorado');
-    const ignoradosPasta = estado.arquivos.length - lidos.length;
+    const deOutraPagina = estado.arquivos.filter((x) => x.tipo === 'ignorado' && x.motivo);
+    const ignoradosPasta = estado.arquivos.length - lidos.length - deOutraPagina.length;
     if (lidos.length) {
       alvo.appendChild(CV.ui.criarTabela({
         colunas: [
@@ -975,7 +1020,8 @@
         linhas: lidos, ordem: { id: 'qdo', dir: 'desc' },
       }));
     }
-    if (ignoradosPasta) alvo.appendChild(h('p', { class: 'nota', text: ignoradosPasta + ' outra(s) planilha(s) da pasta não são de Atividades nem de Resultados e foram ignoradas.' }));
+    if (deOutraPagina.length) alvo.appendChild(h('p', { class: 'nota', text: 'Deixados de lado nesta página (são da outra): ' + deOutraPagina.slice(0, 6).map((x) => x.nome.split('/').pop() + ' — ' + x.motivo).join('; ') + (deOutraPagina.length > 6 ? '…' : '') + '.' }));
+    if (ignoradosPasta > 0) alvo.appendChild(h('p', { class: 'nota', text: ignoradosPasta + ' outra(s) planilha(s) da pasta não são de Atividades nem de Resultados e foram ignoradas.' }));
     alvo.appendChild(h('div', { class: 'cabeca', style: { marginTop: '16px' } }, h('span', { class: 'espaco' }),
       h('button', { class: 'btn mini', text: 'Baixar o cruzamento completo (Excel, com os filtros atuais)', on: { click: exportarCruzamento } })));
   }

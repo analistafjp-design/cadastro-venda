@@ -126,14 +126,16 @@
    *  - visitas cadastrais de QUALQUER equipe ficam (servem para ligar os retornos pela matrícula);
    *  - as demais atividades (refeição, DDS, carregamento, clima, cobrança...) só ficam se forem de
    *    uma equipe do escopo: servem para calcular os tempos das equipes.
+   * Com `opc.soEscopo`, só ficam as atividades de equipes do escopo (página VCG).
    * Retorna { limpas, descartes: { semId, semData, outrosServicos: n } }.
    */
-  function limparAtividades(linhas) {
+  function limparAtividades(linhas, opc) {
+    const soEscopo = !!(opc && opc.soEscopo);
     const descartes = { semId: 0, semData: 0, outrosServicos: 0 };
     const limpas = [];
     for (const raw of linhas) {
       const a = limparAtividade(raw);
-      if (!ehCadastral(a.tipo) && !CV.escopo.equipeNoEscopo(a.recurso)) { descartes.outrosServicos++; continue; }
+      if ((soEscopo || !ehCadastral(a.tipo)) && !CV.escopo.equipeNoEscopo(a.recurso)) { descartes.outrosServicos++; continue; }
       if (!a.id) { descartes.semId++; continue; }
       if (!a.data) { descartes.semData++; continue; }
       limpas.push(a);

@@ -13,6 +13,20 @@ e responde, **separado por data**: *quantas visitas geraram resultado, por equip
 
 O painel olha só a operação do interior: **10 equipes** (`RIORECIN-004/007/013/024/034` e `RIOVENIN-001 a 005`) e **12 cidades** (Aperibé, Cachoeiras de Macacu, Cambuci, Cantagalo, Casimiro de Abreu, Cordeiro, Duas Barras, Itaocara, Miracema, Rio Bonito, São Francisco de Itabapoana e São Sebastião do Alto). Outras equipes e cidades (ex.: São Gonçalo) ficam de fora dos números.
 
+## Duas páginas: Interior e VCG
+
+| Página | Endereço | Equipes | Lê |
+|---|---|---|---|
+| **Interior** | `index.html` | as 10 do interior, nas 12 cidades | Atividades e Resultados (como sempre) |
+| **VCG** | `vcg.html` | `RIOVCGVENIN-001`, `-002` e `-004` | Atividades e o arquivo **Resultados VCG** |
+
+O botão **Painel VCG** (no topo do Interior) abre a página do VCG, e **Painel Interior** (no topo do VCG) volta. As duas têm o mesmo visual e as mesmas abas; só mudam as equipes e o que cada uma lê da pasta:
+
+- **Arquivo com “VCG” no nome** (ex.: `Resultados VCG.xlsx`) é lido **só pela página VCG**; o Interior o deixa de lado e continua lendo exatamente o que já lia.
+- A página **VCG só lê Resultados com “VCG” no nome**; as outras planilhas de Resultados (ex.: `Resultados - 2026.xlsx`) ficam para o Interior.
+- As planilhas de **Atividades** servem às duas: cada página fica só com as atividades das suas equipes (no VCG, tudo o que essas três equipes fazem, inclusive ligações e refeição, entra nos tempos).
+- Cada página guarda os seus dados no navegador separadamente. O VCG aproveita a pasta que você já escolheu no Interior: ao abrir pela primeira vez, basta clicar em **Atualizar** (se o navegador pedir permissão).
+
 ## Como usar (3 passos)
 
 1. Abra o painel (`index.html` com duplo clique, ou o link do GitHub Pages).
@@ -79,14 +93,15 @@ O app é um site estático, sem build. No GitHub: *Settings → Pages → Deploy
 ## Desenvolvimento
 
 ```bash
-npm test                         # 88 testes (Node 18+; sem dependências)
+npm test                         # 96 testes (Node 18+; sem dependências)
 python3 tests/fixtures/gerar.py  # regenera as planilhas sintéticas (requer openpyxl)
 ```
 
 Estrutura:
 
 ```
-index.html            tela (abre direto do disco)
+index.html            painel do Interior (abre direto do disco)
+vcg.html              painel do VCG (mesmo código, outras equipes e outro arquivo de Resultados)
 css/app.css           estilos (claro/escuro automático)
 js/
   normalize.js        texto, matrícula, datas, horários
@@ -95,6 +110,7 @@ js/
   projetos.js         nome do projeto + unificação de variações
   resultados.js       classificação do desfecho de cada retorno
   escopo.js           equipes e cidades da operação
+  paginas.js          as duas páginas (Interior e VCG): equipes, banco e quais arquivos cada uma lê
   tempos.js           deslocamento, serviço, apoio e ociosidade por equipe/dia
   dados.js            colunas, limpeza e derivação
   cruzamento.js       atribuição retorno → visita (matrícula + janela)

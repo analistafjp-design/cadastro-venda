@@ -78,6 +78,7 @@ button, select, input { font: inherit; color: inherit; }
   appearance: none; display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line-2); background: var(--surface); color: var(--ink);
   padding: 8px 14px; border-radius: 10px; cursor: pointer; font-weight: 600; line-height: 1.2; box-shadow: 0 1px 2px rgba(17, 23, 42, .04);
 }
+a.btn { text-decoration: none; }
 .btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 .btn:hover { background: var(--surface-2); }
 .btn.primario { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
@@ -102,6 +103,11 @@ button, select, input { font: inherit; color: inherit; }
 .topo .btn.primario:hover { background: #e8eeff; filter: none; }
 .topo .btn.fantasma { background: transparent; border-color: transparent; color: rgba(255, 255, 255, .82); }
 .topo .btn.fantasma:hover { background: rgba(255, 255, 255, .14); color: #fff; }
+
+/* página do VCG: cabeçalho em verde-petróleo, para saber de relance em qual das duas se está */
+body[data-pagina="vcg"] { --head-1: #0f5a5f; --head-2: #0a3d43; }
+body[data-pagina="vcg"] .topo .btn.primario { color: #0a3d43; }
+body[data-pagina="vcg"] .topo .btn.primario:hover { background: #e3f4f2; }
 
 /* ---------- estado vazio / mensagens ---------- */
 .vazio { padding: 40px 0 64px; }
