@@ -104,6 +104,13 @@ a.btn { text-decoration: none; }
 .topo .btn.fantasma { background: transparent; border-color: transparent; color: rgba(255, 255, 255, .82); }
 .topo .btn.fantasma:hover { background: rgba(255, 255, 255, .14); color: #fff; }
 
+/* botão que troca de painel (Painel VCG / Painel Interior): em pílula, com a cor do painel de destino e um traço separando dos demais */
+.topo .btn.troca { position: relative; margin-right: 10px; padding: 8px 16px; border-radius: 999px; border: 2px solid rgba(255, 255, 255, .92); color: #fff; font-weight: 700; letter-spacing: .01em; box-shadow: 0 0 0 3px rgba(255, 255, 255, .14), 0 8px 16px -8px rgba(0, 0, 0, .65); transition: transform .12s, box-shadow .12s; }
+.topo .btn.troca::after { content: ""; position: absolute; right: -14px; top: 18%; height: 64%; width: 1px; background: rgba(255, 255, 255, .35); }
+.topo .btn.troca:hover { transform: translateY(-1px); box-shadow: 0 0 0 4px rgba(255, 255, 255, .22), 0 10px 18px -8px rgba(0, 0, 0, .7); filter: brightness(1.08); }
+.topo .btn.troca { background: linear-gradient(135deg, #19a7b0, #0a6a74); }
+body[data-pagina="vcg"] .topo .btn.troca { background: linear-gradient(135deg, #3f66e6, #1c3a8f); }
+
 /* página do VCG: cabeçalho em verde-petróleo, para saber de relance em qual das duas se está */
 body[data-pagina="vcg"] { --head-1: #0f5a5f; --head-2: #0a3d43; }
 body[data-pagina="vcg"] .topo .btn.primario { color: #0a3d43; }

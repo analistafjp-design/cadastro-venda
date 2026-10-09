@@ -28,9 +28,14 @@
       soEscopo: false, // guarda também as visitas de outras equipes (servem para ligar o retorno pela matrícula)
       herdaPastaDe: null,
       prefixoArquivo: '',
-      /** Motivo para NÃO ler o arquivo nesta página, ou null. `tipo` é null antes de abrir o arquivo. */
-      recusa(caminho) {
-        return ehVcg(caminho) ? 'arquivo de VCG: é lido só na página VCG' : null;
+      /**
+       * Motivo para NÃO ler o arquivo nesta página, ou null. `tipo` ('atividades' | 'resultados') e
+       * `layout` (de Resultados: 'padrao' | 'vcg') são null antes de abrir o arquivo.
+       */
+      recusa(caminho, tipo, layout) {
+        if (ehVcg(caminho)) return 'arquivo de VCG: é lido só na página VCG';
+        if (tipo === 'resultados' && layout === 'vcg') return 'formulário do Resultados VCG (tem “Equipe” e “Atualização realizada”): é lido só na página VCG';
+        return null;
       },
     },
     vcg: {

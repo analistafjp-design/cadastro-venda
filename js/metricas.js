@@ -134,6 +134,7 @@
     { id: 'tarifa', rotulo: 'Tarifa social' },
     { id: 'fatura', rotulo: 'Fatura digital' },
     { id: 'venda', rotulo: 'Venda / ligação nova' },
+    { id: 'novo', rotulo: 'Novo cliente (lote não cadastrado)' },
     { id: 'debitos', rotulo: 'Negociação de débitos' },
     { id: 'decr', rotulo: 'Decremento de economia' },
     { id: 'eco', rotulo: 'Alteração de economia' },
@@ -156,6 +157,7 @@
     if (t.has('tarifa_social')) out.push('tarifa');
     if (t.has('fatura')) out.push('fatura');
     if (t.has('venda')) out.push('venda');
+    if (t.has('novo_cliente')) out.push('novo');
     if (t.has('debitos')) out.push('debitos');
     if (t.has('decremento')) out.push('decr');
     if (eco && !cat && !inc) out.push('eco');
@@ -168,7 +170,7 @@
   /** Os números dos cards da visão geral. */
   function cartoes(visitas) {
     const r = resumo(visitas);
-    const c = { percorrido: r.percorrido, exec: r.exec, oc: r.oc, resultado: r.resultado, taxa: r.taxaResultado, inc: 0, incCat: 0, totalInc: 0, totalCat: 0, titular: 0, outros: 0 };
+    const c = { percorrido: r.percorrido, exec: r.exec, oc: r.oc, resultado: r.resultado, taxa: r.taxaResultado, inc: 0, incCat: 0, totalInc: 0, totalCat: 0, titular: 0, venda: 0, novo: 0, debitos: 0, outros: 0 };
     for (const v of comResultado(visitas)) {
       const tp = new Set(tiposDoResultado(v));
       if (tp.has('inc')) c.inc++;
@@ -176,6 +178,9 @@
       if (tp.has('inc') || tp.has('inc_cat')) c.totalInc++;
       if (tp.has('cat') || tp.has('inc_cat')) c.totalCat++;
       if (tp.has('titular')) c.titular++;
+      if (tp.has('venda')) c.venda++;
+      if (tp.has('novo')) c.novo++;
+      if (tp.has('debitos')) c.debitos++;
       if (!['inc', 'inc_cat', 'cat', 'titular'].some((k) => tp.has(k))) c.outros++;
     }
     return c;
@@ -208,6 +213,63 @@
     }));
     linhas.sort((a, b) => b.resultado - a.resultado || b.exec - a.exec || a.recurso.localeCompare(b.recurso, 'pt-BR'));
     return linhas;
+  }
+
+  // ---------- conferência dos lançamentos com as atividades (formulário VCG) ----------
+
+  /**
+   * Para cada equipe do escopo, o que aconteceu com os lançamentos do formulário de Resultados
+   * que dizem ser dela: existe atividade dela com aquela matrícula? Foi executada? Cabe na janela?
+   * @param resultados  lançamentos limpos ({ equipe, mat, data })
+   * @param atividades  atividades limpas guardadas ({ recurso, mat, data, status, tipo })
+   * @returns { porEquipe: [{ equipe, lancados, executada, naoExecutada, foraJanela, outraEquipe, sem }],
+   *            foraEscopo: [[equipe, n]], semMatricula, atividades: { n, dias, min, max } }
+   */
+  function conferirLancamentos(resultados, atividades, janelaDias) {
+    const Nrm = N();
+    const R = CV.regras;
+    const janela = janelaDias === undefined ? R.janelaDias : janelaDias;
+    const chaveEq = (r) => Nrm.chave(r).replace(/ /g, '');
+    const porMat = new Map();
+    const dias = new Set();
+    let min = null;
+    let max = null;
+    for (const a of atividades) {
+      if (!CV.escopo.equipeNoEscopo(a.recurso)) continue;
+      if (a.data) {
+        dias.add(a.data);
+        if (!min || a.data < min) min = a.data;
+        if (!max || a.data > max) max = a.data;
+      }
+      if (!a.mat) continue;
+      if (!porMat.has(a.mat)) porMat.set(a.mat, []);
+      porMat.get(a.mat).push(a);
+    }
+    const exec = new Set(R.status.executada);
+    const linhas = new Map(R.escopo.equipes.map((e) => [chaveEq(e), { equipe: e, lancados: 0, executada: 0, naoExecutada: 0, foraJanela: 0, outraEquipe: 0, sem: 0 }]));
+    const fora = new Map();
+    let semMatricula = 0;
+    for (const r of resultados) {
+      if (!r.equipe) continue;
+      const l = linhas.get(chaveEq(r.equipe));
+      if (!l) { fora.set(r.equipe, (fora.get(r.equipe) || 0) + 1); continue; }
+      l.lancados++;
+      if (!r.mat) { semMatricula++; l.sem++; continue; }
+      const todas = porMat.get(r.mat) || [];
+      if (!todas.length) { l.sem++; continue; }
+      const dela = todas.filter((a) => chaveEq(a.recurso) === chaveEq(r.equipe));
+      if (!dela.length) { l.outraEquipe++; continue; }
+      const naJanela = dela.filter((a) => r.data && a.data <= r.data && Nrm.diasEntre(a.data, r.data) <= janela);
+      if (!naJanela.length) { l.foraJanela++; continue; }
+      if (naJanela.some((a) => exec.has(Nrm.chave(a.status)))) l.executada++;
+      else l.naoExecutada++;
+    }
+    return {
+      porEquipe: Array.from(linhas.values()),
+      foraEscopo: Array.from(fora.entries()).sort((a, b) => b[1] - a[1]),
+      semMatricula,
+      atividades: { n: atividades.filter((a) => CV.escopo.equipeNoEscopo(a.recurso)).length, dias: dias.size, min, max },
+    };
   }
 
   // ---------- novos alvos ----------
@@ -356,7 +418,7 @@
 
   CV.metricas = {
     filtrar, resumo, agruparPor, porPeriodo, textosAvulsas, criarModeloChance,
-    TIPOS_RESULTADO, tiposDoResultado, cartoes, resultadoPorEquipe,
+    TIPOS_RESULTADO, tiposDoResultado, cartoes, resultadoPorEquipe, conferirLancamentos,
     alvosOcorrencia, alvosSemRetorno, alvosEsgotados, territorios,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = CV.metricas;

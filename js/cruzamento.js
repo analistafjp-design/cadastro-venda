@@ -18,6 +18,8 @@
     return v.grupoStatus === 'exec' ? 2 : v.grupoStatus === 'oc' ? 1 : 0;
   }
 
+  const chaveEquipe = (r) => N().chave(r).replace(/ /g, '');
+
   function compararVisitas(a, b) {
     if (a.data !== b.data) return a.data < b.data ? -1 : 1;
     const pa = pesoStatus(a);
@@ -77,6 +79,7 @@
       resgatadosProtocolo: 0,
       foraDasBases: 0,
       anteriorVisita: 0,
+      outraEquipe: 0, // o lançamento diz a equipe (formulário VCG) e a matrícula só foi visitada por outra
       foraJanela: 0,
       atribuidos: 0,
       visitasSemMatricula: vs.filter((v) => !v.mat).length,
@@ -93,8 +96,11 @@
         if (viaProt) { mat = viaProt; aud.resgatadosProtocolo++; } else { aud.matriculaInvalida++; continue; }
       }
       if (!r.data) { aud.semData++; continue; }
-      const lista = porMat.get(mat);
-      if (!lista) { aud.foraDasBases++; continue; }
+      const todas = porMat.get(mat);
+      if (!todas) { aud.foraDasBases++; continue; }
+      // quando o lançamento traz a equipe, só vale a visita dessa mesma equipe
+      const lista = r.equipe ? todas.filter((v) => chaveEquipe(v.recurso) === chaveEquipe(r.equipe)) : todas;
+      if (!lista.length) { aud.outraEquipe++; continue; }
       let alvo = null;
       for (let i = lista.length - 1; i >= 0; i--) {
         if (lista[i].data <= r.data) { alvo = lista[i]; break; }

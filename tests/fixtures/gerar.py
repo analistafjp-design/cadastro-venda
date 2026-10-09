@@ -111,6 +111,39 @@ def linhas_resultados():
     ]
 
 
+CAB_RES_VCG = [
+    "Id", "Hora de início", "Hora de conclusão", "Email", "Nome", "DATA:", "Matrícula\u00a0", "Bairro", "Equipe",
+    "Atualização realizada", "Quantas economias adicionadas", "Categoria adicionada", "Observação",
+]
+
+# nas planilhas do VCG as equipes do cadastro viram as equipes do VCG
+EQUIPES_VCG = {"RIORECIN-001": "RIOVCGVENIN-001", "RIORECIN-002": "RIOVCGVENIN-002", "RIOVENIN-001": "RIOVCGVENIN-004", "RIOCORTE-001": "RIOVCGEXTIN-001"}
+
+
+def linhas_atividades_vcg():
+    return [[EQUIPES_VCG.get(l[0], l[0])] + l[1:] for l in linhas_atividades()]
+
+
+def linhas_resultados_vcg():
+    """Formulário "Resultados VCG": o lançamento diz a equipe e o que foi atualizado."""
+    def r(id_, ini, mat, equipe, atu, qtd, obs, cat="Residencial", data=None, bairro="Centro"):
+        return [id_, ini, ini, "anonima@exemplo.com", "Analista Teste", data, mat, bairro, equipe, atu, str(qtd), cat, obs]
+
+    return [
+        r(501, D(2026, 3, 3), 100000001, "RIOVCGVENIN-001", "Incremento de economia", 1, "Atualização de economia"),
+        r(502, D(2026, 3, 3), 100000002, "RIOVCGVENIN-001", "Nome do Bairro", 1, "Atualização do bairro"),
+        r(503, D(2026, 3, 4), 100000004, "RIOVCGVENIN-004", "Alteração de Categoria", 1, "Ajuste de Categoria", cat="Comercial"),
+        r(504, D(2026, 3, 6), 100000008, "RIOVCGVENIN-002", "Venda Factível", 1, "Venda"),
+        r(505, D(2026, 3, 8), 100000009, "RIOVCGVENIN-001", "Troca de Titularidade", 0, "Troca de titularidade"),  # visita é da equipe 004
+        r(506, D(2026, 3, 7), 100000010, "RIOVCGVENIN-002", "Ajuste de Economia", 0, "Remoção de Economia"),
+        r(507, D(2026, 3, 9), 999999999, "RIOVCGVENIN-002", "Negociação", 0, "Negociação de débitos"),  # fora das bases
+        r(508, D(2026, 3, 10), 100000001, "RIOVCGVENIN-001", "Telefone", 1, "Atualização de telefone"),
+        r(509, D(2026, 3, 5), 100000003, "RIOVCGVENIN-003", "Venda Factível", 1, "Venda factível"),  # equipe fora do painel
+        r(510, D(2026, 3, 8), 100000011, "RIOVCGVENIN-002", "Lote não cadastrado - Novo cliente", 1, "Cadastro completo"),
+        r(511, D(2026, 3, 12, 9, 30), 100000005, "RIOVCGVENIN-002", "Endereço", 0, "Atualização de bairro", data=D(2026, 3, 6)),  # DATA: informada
+    ]
+
+
 def planilha(caminho, aba, cab, linhas, topo=0):
     wb = Workbook()
     ws = wb.active
@@ -185,6 +218,11 @@ if __name__ == "__main__":
     exemplo = [[escopo.get(l[0], l[0])] + l[1:] for l in linhas_atividades() if not str(l[0]).startswith("RIOCORTE")]
     planilha(os.path.join(EXEMPLOS, "exemplo-atividades.xlsx"), "Cadastral", CAB_ATIV, exemplo)
     planilha(os.path.join(EXEMPLOS, "exemplo-resultados.xlsx"), "Planilha1", CAB_RES, linhas_resultados())
+    # VCG: atividades das equipes do VCG e o formulário "Resultados VCG"
+    planilha(os.path.join(AQUI, "resultados_vcg.xlsx"), "Planilha1", CAB_RES_VCG, linhas_resultados_vcg())
+    planilha(os.path.join(EXEMPLOS, "exemplo-atividades-vcg.xlsx"), "Cadastral", CAB_ATIV, linhas_atividades_vcg())
+    planilha(os.path.join(EXEMPLOS, "exemplo-resultados-vcg.xlsx"), "Planilha1", CAB_RES_VCG, linhas_resultados_vcg())
+    planilha(os.path.join(AQUI, "atividades_vcg.xlsx"), "Cadastral", CAB_ATIV, linhas_atividades_vcg())
     planilha(os.path.join(AQUI, "atividades_cabecalho_na_linha_3.xlsx"), "Cadastral", CAB_ATIV, linhas_atividades()[:3], topo=2)
     export_estilo_sistema(os.path.join(AQUI, "atividades_export_sistema.xlsx"))
     print("fixtures geradas em", AQUI)

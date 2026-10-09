@@ -112,6 +112,42 @@
     return { tags: lista.map((c) => c.id), grupo, principal, deltaEcon };
   }
 
-  CV.resultados = { classificar, deltaEconomias, totalEconomias };
+  /**
+   * Classifica um lançamento do formulário "Resultados VCG": { atualizacao, obs, qtdEcon }.
+   * "Atualização realizada" diz o que foi feito; a observação desempata (as pessoas às vezes
+   * escolhem a opção genérica e explicam no texto). Saída igual à de `classificar`.
+   */
+  function classificarVcg(r) {
+    const A = N().chave(r.atualizacao);
+    const O = N().chave(r.obs);
+    const Q = typeof r.qtdEcon === 'number' && Number.isFinite(r.qtdEcon) ? r.qtdEcon : null;
+    const tags = new Set();
+
+    const titularidade = /TITULARIDADE/.test(A) || /TITULARIDADE/.test(O);
+    const venda = /\bVENDA\b/.test(A) || /\bVENDA\b/.test(O);
+    if (titularidade) tags.add('titularidade');
+    if (venda) tags.add('venda');
+    if (/NEGOCIACAO|UNIFICACAO|REPARCELAMENTO/.test(A + ' ' + O)) tags.add('debitos');
+    if (/NOVO CLIENTE|LOTE NAO CADASTRADO/.test(A) && !titularidade && !venda) tags.add('novo_cliente');
+    if (/CATEGORIA/.test(A)) tags.add('categoria');
+    if (/INCREMENTO/.test(A)) {
+      tags.add('incremento');
+    } else if (/ECONOMIA/.test(A) || (/CATEGORIA/.test(A) && /ECONOMIA/.test(O))) {
+      if (/RETIRAD|REMOCAO|REMOVID|TIRANDO|TIRAD|DESMEMBRAMENTO/.test(O)) tags.add('decremento');
+      else if (/ACRESCENT|INCLUSAO|INCREMENT|MAIS UMA|ADICIONAD/.test(O) || (Q !== null && Q > 0)) tags.add('incremento');
+      else tags.add('economia');
+    }
+    if (/FATURA/.test(O)) tags.add('fatura');
+    if (tags.size === 0) tags.add(A ? 'atualizacao' : 'sem');
+
+    const classes = CV.regras.classes;
+    const lista = classes.filter((c) => tags.has(c.id));
+    const principal = lista.length ? lista[0].id : 'sem';
+    const grupo = lista.some((c) => c.grupo === 'resultado') ? 'resultado' : lista.some((c) => c.grupo === 'atualizacao') ? 'atualizacao' : 'sem';
+    const acrescimo = tags.has('incremento') || tags.has('venda') || tags.has('novo_cliente');
+    return { tags: lista.map((c) => c.id), grupo, principal, deltaEcon: acrescimo && Q !== null && Q > 0 ? Q : null };
+  }
+
+  CV.resultados = { classificar, classificarVcg, deltaEconomias, totalEconomias };
   if (typeof module !== 'undefined' && module.exports) module.exports = CV.resultados;
 })(typeof window !== 'undefined' ? window : globalThis);

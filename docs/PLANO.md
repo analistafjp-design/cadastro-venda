@@ -30,7 +30,7 @@ Cruzamento: o retorno é lançado **depois** da visita (mediana de 1 dia), entã
 
 - **Leitor conferido célula a célula** contra openpyxl/pandas nos três arquivos reais (≈ 220 mil células, 0 divergências).
 - **Cruzamento e agregações reimplementados de forma independente em Python** (busca binária, outra lógica) e comparados visita a visita nos dados reais: 9.536 visitas, 0 divergências; 244 grupos de agregação (projeto, equipe, dia), 0 divergências; mesmos contadores de auditoria.
-- **96 testes automatizados** (`npm test`) com planilhas sintéticas, cada cenário de cruzamento com resultado calculado à mão: dois retornos da mesma matrícula, mesmo dia (ocorrência × executada), retorno antes da visita, fora da janela, protocolo no lugar da matrícula, matrícula inválida, frente de serviço, maturação, nome de projeto com encoding quebrado etc.
+- **104 testes automatizados** (`npm test`) com planilhas sintéticas, cada cenário de cruzamento com resultado calculado à mão: dois retornos da mesma matrícula, mesmo dia (ocorrência × executada), retorno antes da visita, fora da janela, protocolo no lugar da matrícula, matrícula inválida, frente de serviço, maturação, nome de projeto com encoding quebrado etc.
 - **A conta fecha na tela**: todo retorno cai em exatamente um balde na Auditoria; resultado + atualização + sem tratativa = com retorno; com retorno + sem retorno = executadas.
 - **Teste no navegador** (Chromium headless, `file://`): carga, recarga com persistência, recarga do mesmo arquivo sem duplicar, arquivo inválido, limpar dados, modo escuro, celular.
 
