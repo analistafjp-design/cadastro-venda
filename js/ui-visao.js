@@ -1,7 +1,8 @@
 /*
  * ui-visao.js — as duas páginas principais:
  *   Visão geral      : cards (Percorrido, Exec, Exoc, Com resultados, tipos de resultado),
- *                      bases, resultado por equipe (com "+" para abrir os serviços) e por data.
+ *                      (VCG: lançamentos por equipe e tipo), bases, resultado por equipe (com "+"
+ *                      para abrir os serviços) e por data.
  *   Tempos das equipes: deslocamento, serviço, pausas/apoio e ociosidade.
  */
 (function (global) {
@@ -39,11 +40,43 @@
     taxa && max ? h('span', { class: 'barra', style: { width: Math.max(2, (taxa / max) * 100) + '%' } }) : null,
     h('span', { class: 'valor', text: fmt.pct(taxa) })));
 
+  // ======================================================================= Lançamentos por equipe e tipo (VCG)
+
+  /**
+   * Matriz equipe × tipo com os lançamentos do formulário (página VCG). Vem direto da planilha de
+   * Resultados, sem passar pelas visitas. `L` é o retorno de metricas.lancamentosPorEquipeTipo.
+   * `aviso`: texto extra para o rodapé (ex.: filtros que não se aplicam). `ordemDe(id, padrao)`.
+   */
+  function blocoLancamentos(L, ordemDe, aviso) {
+    const b = bloco('Lançamentos por equipe e tipo',
+      'O que o backoffice lançou como resultado no formulário do VCG, equipe por equipe. Vem direto da planilha: não depende de a equipe ter visita carregada.');
+    const linhas = L.linhas.filter((l) => l.total > 0); // só quem trouxe resultado
+    const notas = [];
+    if (L.cadastrais > 0) notas.push(fmt.int(L.cadastrais) + ' lançamento(s) do período são só atualização cadastral (nome do bairro, telefone, endereço...) e não contam como resultado.');
+    if (L.multiplos > 0) notas.push('Um lançamento pode ter mais de um tipo (ex.: venda e troca de titularidade), então a soma das colunas pode passar do total.');
+    if (L.foraEscopo > 0) notas.push(fmt.int(L.foraEscopo) + ' lançamento(s) de equipes fora do painel (ex.: RIOVCGVENIN-003) não entram.');
+    if (L.semEquipe > 0) notas.push(fmt.int(L.semEquipe) + ' lançamento(s) sem equipe preenchida não entram.');
+    if (aviso) notas.push(aviso);
+    if (!linhas.length) {
+      b.appendChild(h('p', { class: 'nota', text: 'Nenhum lançamento de resultado das equipes do painel neste período.' + (notas.length ? ' ' + notas.join(' ') : '') }));
+      return b;
+    }
+    const colunas = [
+      { id: 'eq', titulo: 'Equipe', tipo: 'txt', valor: (l) => l.recurso },
+      { id: 'tot', titulo: 'Lançamentos', tipo: 'num', valor: (l) => l.total, dica: 'Lançamentos de resultado da equipe no período (sem as atualizações cadastrais)' },
+    ].concat(L.tipos.map((t) => ({ id: 't_' + t.id, titulo: t.curto, tipo: 'num', valor: (l) => l.tipos[t.id] || 0, dica: t.rotulo })));
+    const total = { recurso: 'Total', ehTotal: true, total: L.total, tipos: Object.fromEntries(L.tipos.map((t) => [t.id, t.n])) };
+    b.appendChild(ui.criarTabela({ colunas, linhas, total, ordem: ordemDe ? ordemDe('lancamentos', { id: 'tot', dir: 'desc' }) : { id: 'tot', dir: 'desc' } }));
+    if (notas.length) b.appendChild(h('p', { class: 'nota', text: notas.join(' ') }));
+    return b;
+  }
+
   // ======================================================================= Visão geral
 
   /**
    * ctx: { vs (visitas já filtradas), equipes (nomes do escopo), gran, aoMudarGran(g),
-   *        ordemDe(id, padrao), abertas (Set de equipes abertas) }
+   *        ordemDe(id, padrao), abertas (Set de equipes abertas), vcg,
+   *        lancamentos (só VCG: metricas.lancamentosPorEquipeTipo), avisoLancamentos }
    */
   function renderVisao(alvo, ctx) {
     const R = CV.regras;
@@ -81,6 +114,7 @@
       tipos.push(cartao('Outros resultados', fmt.int(c.outros), 'var(--c-claro)', 'Tarifa social, fatura digital, venda, negociação de débitos, decremento...'));
     }
     alvo.appendChild(h('div', { class: 'cartoes' }, tipos));
+    if (ctx.lancamentos) alvo.appendChild(blocoLancamentos(ctx.lancamentos, ctx.ordemDe, ctx.avisoLancamentos));
 
     // ------------------------------------------------------------- Bases
     const linhasBase = M().agruparPor(ctx.vs, (v) => v.projeto).filter((l) => l.percorrido > 0);
@@ -249,6 +283,7 @@
     alvo.appendChild(blocoT);
   }
 
+  ui.blocoLancamentos = blocoLancamentos;
   ui.renderVisao = renderVisao;
   ui.renderTempos = renderTempos;
   if (typeof module !== 'undefined' && module.exports) module.exports = ui;
