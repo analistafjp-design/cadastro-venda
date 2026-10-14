@@ -127,17 +127,17 @@
 
   /** Os "serviços" que trazem resultado, na ordem em que aparecem nas telas. */
   const TIPOS_RESULTADO = [
-    { id: 'inc', rotulo: 'Incremento de economia' },
-    { id: 'inc_cat', rotulo: 'Incremento de economia e alteração de categoria' },
-    { id: 'cat', rotulo: 'Alteração de categoria' },
-    { id: 'titular', rotulo: 'Troca de titularidade' },
-    { id: 'tarifa', rotulo: 'Tarifa social' },
-    { id: 'fatura', rotulo: 'Fatura digital' },
-    { id: 'venda', rotulo: 'Venda / ligação nova' },
-    { id: 'novo', rotulo: 'Novo cliente (lote não cadastrado)' },
-    { id: 'debitos', rotulo: 'Negociação de débitos' },
-    { id: 'decr', rotulo: 'Decremento de economia' },
-    { id: 'eco', rotulo: 'Alteração de economia' },
+    { id: 'inc', rotulo: 'Incremento de economia', curto: 'Incremento' },
+    { id: 'inc_cat', rotulo: 'Incremento de economia e alteração de categoria', curto: 'Incremento e categoria' },
+    { id: 'cat', rotulo: 'Alteração de categoria', curto: 'Categoria' },
+    { id: 'titular', rotulo: 'Troca de titularidade', curto: 'Titularidade' },
+    { id: 'tarifa', rotulo: 'Tarifa social', curto: 'Tarifa social' },
+    { id: 'fatura', rotulo: 'Fatura digital', curto: 'Fatura digital' },
+    { id: 'venda', rotulo: 'Venda / ligação nova', curto: 'Venda' },
+    { id: 'novo', rotulo: 'Novo cliente (lote não cadastrado)', curto: 'Novo cliente' },
+    { id: 'debitos', rotulo: 'Negociação de débitos', curto: 'Negociação' },
+    { id: 'decr', rotulo: 'Decremento de economia', curto: 'Decremento' },
+    { id: 'eco', rotulo: 'Alteração de economia', curto: 'Economia' },
   ];
 
   /**
@@ -270,6 +270,47 @@
       semMatricula,
       atividades: { n: atividades.filter((a) => CV.escopo.equipeNoEscopo(a.recurso)).length, dias: dias.size, min, max },
     };
+  }
+
+  // ---------- lançamentos do formulário por equipe e tipo (página VCG) ----------
+
+  /**
+   * Conta os lançamentos do formulário de Resultados (os que dizem a equipe) por equipe e por tipo de
+   * resultado, direto da planilha: NÃO olha as atividades, então vale mesmo sem visita carregada.
+   * Só entram como resultado os lançamentos de valor (venda, novo cliente, incremento, categoria,
+   * titularidade, negociação...); o que é só atualização cadastral fica à parte, em `cadastrais`.
+   * @param lancamentos  resultados limpos ({ equipe, data, ... }); a classificação é feita aqui
+   * @param opc          { de, ate (datas ISO do período), equipe (uma equipe só, ou vazio = todas) }
+   * @returns { linhas: [{ recurso, total, tipos: { id: n } }]   uma por equipe do escopo,
+   *            tipos: [{ id, rotulo, curto, n }]                só os tipos que apareceram,
+   *            total, cadastrais, multiplos, foraEscopo, semEquipe }
+   */
+  function lancamentosPorEquipeTipo(lancamentos, opc) {
+    const o = opc || {};
+    const chave = (r) => N().chave(r).replace(/ /g, '');
+    const alvo = o.equipe ? chave(o.equipe) : null;
+    const porEquipe = new Map(CV.regras.escopo.equipes.filter((e) => !alvo || chave(e) === alvo).map((e) => [chave(e), { recurso: e, total: 0, tipos: {} }]));
+    const doPeriodo = lancamentos.filter((r) => (!o.de || (r.data && r.data >= o.de)) && (!o.ate || (r.data && r.data <= o.ate)));
+    const somaTipo = {};
+    const out = { linhas: [], tipos: [], total: 0, cadastrais: 0, multiplos: 0, foraEscopo: 0, semEquipe: 0 };
+    for (const r of CV.dados.derivarResultados(doPeriodo)) {
+      if (!r.equipe) { out.semEquipe++; continue; }
+      if (!CV.escopo.equipeNoEscopo(r.equipe)) { out.foraEscopo++; continue; }
+      const l = porEquipe.get(chave(r.equipe));
+      if (!l) continue; // é do escopo, mas não é a equipe escolhida no filtro
+      if (r.grupo !== 'resultado') { out.cadastrais++; continue; }
+      const ids = tiposDoResultado(r);
+      l.total++;
+      out.total++;
+      if (ids.length > 1) out.multiplos++;
+      for (const id of ids) {
+        l.tipos[id] = (l.tipos[id] || 0) + 1;
+        somaTipo[id] = (somaTipo[id] || 0) + 1;
+      }
+    }
+    out.linhas = Array.from(porEquipe.values());
+    out.tipos = TIPOS_RESULTADO.filter((t) => somaTipo[t.id] > 0).map((t) => Object.assign({ n: somaTipo[t.id] }, t));
+    return out;
   }
 
   // ---------- novos alvos ----------
@@ -418,7 +459,7 @@
 
   CV.metricas = {
     filtrar, resumo, agruparPor, porPeriodo, textosAvulsas, criarModeloChance,
-    TIPOS_RESULTADO, tiposDoResultado, cartoes, resultadoPorEquipe, conferirLancamentos,
+    TIPOS_RESULTADO, tiposDoResultado, cartoes, resultadoPorEquipe, conferirLancamentos, lancamentosPorEquipeTipo,
     alvosOcorrencia, alvosSemRetorno, alvosEsgotados, territorios,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = CV.metricas;

@@ -25,6 +25,7 @@ O botão **Painel VCG** (no topo do Interior) abre a página do VCG, e **Painel 
 - **Arquivo com “VCG” no nome** (ex.: `Resultados VCG.xlsx`) é lido **só pela página VCG**; o Interior o deixa de lado e continua lendo exatamente o que já lia.
 - A página **VCG só lê Resultados com “VCG” no nome**; as outras planilhas de Resultados (ex.: `Resultados - 2026.xlsx`) ficam para o Interior.
 - O **Resultados VCG** é o formulário do backoffice do VCG: cada lançamento traz a **Equipe**, a **Matrícula** e a **Atualização realizada** (Nome do Bairro, Venda Factível, Lote não cadastrado - Novo cliente, Incremento de economia, Troca de Titularidade, Negociação...). A página o reconhece pelo cabeçalho. Venda, novo cliente, incremento, categoria, titularidade, negociação e fatura contam como **resultado**; telefone, endereço, nº de porta e nome do bairro são só **atualização cadastral**.
+- Na **Visão geral do VCG**, o bloco **Lançamentos por equipe e tipo** conta o que cada equipe lançou como resultado (venda, novo cliente, incremento, categoria, titularidade, negociação...), **direto da planilha**: vale mesmo sem nenhuma Atividade carregada e respeita o período e a equipe escolhidos. Só aparecem as equipes com resultado; as atualizações cadastrais e as equipes fora do painel ficam de fora e são avisadas embaixo da tabela.
 - Como o lançamento diz a equipe, o resultado só é ligado à visita **da mesma equipe** (mesma matrícula, até 30 dias antes). Lançamentos de equipes fora do painel (ex.: `RIOVCGVENIN-003`) ficam de fora e aparecem na Auditoria.
 - As planilhas de **Atividades** servem às duas: cada página fica só com as atividades das suas equipes (no VCG, tudo o que essas três equipes fazem, inclusive ligações e refeição, entra nos tempos).
 - Cada página guarda os seus dados no navegador separadamente. O VCG aproveita a pasta que você já escolheu no Interior: ao abrir pela primeira vez, basta clicar em **Atualizar** (se o navegador pedir permissão).
@@ -95,7 +96,7 @@ O app é um site estático, sem build. No GitHub: *Settings → Pages → Deploy
 ## Desenvolvimento
 
 ```bash
-npm test                         # 104 testes (Node 18+; sem dependências)
+npm test                         # 110 testes (Node 18+; sem dependências)
 python3 tests/fixtures/gerar.py  # regenera as planilhas sintéticas (requer openpyxl)
 ```
 

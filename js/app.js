@@ -434,10 +434,27 @@
     cacheVs = null;
   }
 
+  /** Lançamentos do formulário das equipes do painel (só a página VCG tem esse formulário). */
+  function lancamentosDoPainel() {
+    if (PAG.id !== 'vcg') return [];
+    return Array.from(estado.resultados.values()).filter((r) => r.equipe && CV.escopo.equipeNoEscopo(r.equipe));
+  }
+
+  /** Primeiro e último dia com dado: visitas e tempos e, no VCG, também os lançamentos (que valem sem visita). */
+  function limitesDatas() {
+    let { min, max } = estado.datas;
+    for (const r of lancamentosDoPainel()) {
+      if (!r.data) continue;
+      if (!min || r.data < min) min = r.data;
+      if (!max || r.data > max) max = r.data;
+    }
+    return { min, max };
+  }
+
   function aplicarPreset(p) {
     const f = estado.filtros;
     f.preset = p;
-    const { min, max } = estado.datas;
+    const { min, max } = limitesDatas();
     if (!max) { f.de = null; f.ate = null; return; }
     if (p === 'tudo') { f.de = min; f.ate = max; }
     else if (p === 'mes') { f.de = max.slice(0, 8) + '01'; f.ate = max; }
@@ -447,8 +464,9 @@
 
   function granularidadeAtual() {
     if (estado.granManual) return estado.gran;
-    const ini = estado.filtros.de || estado.datas.min;
-    const fim = estado.filtros.ate || estado.datas.max;
+    const lim = limitesDatas();
+    const ini = estado.filtros.de || lim.min;
+    const fim = estado.filtros.ate || lim.max;
     if (!ini || !fim) return 'dia';
     const dias = N.diasEntre(ini, fim) + 1;
     return dias <= 62 ? 'dia' : dias <= 200 ? 'semana' : 'mes';
@@ -479,6 +497,18 @@
 
   const equipesVisiveis = () => (estado.filtros.equipe ? [estado.filtros.equipe] : estado.opcoes.equipes);
 
+  /** Lançamentos do formulário por equipe e tipo, no período e na equipe escolhidos (VCG). */
+  function lancamentosFiltrados() {
+    const f = estado.filtros;
+    return M.lancamentosPorEquipeTipo(Array.from(estado.resultados.values()), { de: f.de, ate: f.ate, equipe: f.equipe });
+  }
+
+  /** Cidade e base vêm das atividades: o formulário não tem esses campos. */
+  function avisoLancamentos() {
+    const f = estado.filtros;
+    return f.cidade || f.base ? 'Os filtros de cidade e base não se aplicam aos lançamentos (o formulário não traz esses dados).' : '';
+  }
+
   /** Os tempos mostram só as equipes que trouxeram resultado no período (cidade e base não se aplicam). */
   function equipesComResultado() {
     const com = new Set();
@@ -499,7 +529,8 @@
     const refs = (estado.refs = {});
     const semTerritorio = estado.aba === 'tempos';
 
-    const inData = (valor, rotulo) => h('input', { type: 'date', value: valor || '', min: estado.datas.min || '', max: estado.datas.max || '', attrs: { 'aria-label': rotulo } });
+    const lim = limitesDatas();
+    const inData = (valor, rotulo) => h('input', { type: 'date', value: valor || '', min: lim.min || '', max: lim.max || '', attrs: { 'aria-label': rotulo } });
     refs.de = inData(f.de, 'Data inicial');
     refs.ate = inData(f.ate, 'Data final');
     const mudouData = () => {
@@ -580,7 +611,8 @@
   // ---------------------------------------------------------------- render
 
   function renderTudo() {
-    const temDados = !!(estado.cruzado && (estado.cruzado.visitas.length || estado.agenda.length));
+    const temLancamentos = lancamentosDoPainel().length > 0; // VCG: os lançamentos já dizem o que as equipes trouxeram
+    const temDados = !!(estado.cruzado && (estado.cruzado.visitas.length || estado.agenda.length)) || temLancamentos;
     $('vazio').hidden = temDados;
     $('app').hidden = !temDados;
     $('abas').hidden = !temDados;
@@ -597,7 +629,7 @@
     const partes = [];
     partes.push(fmt.int(estado.totalPercorrido) + ' percorridas');
     if (estado.datas.max) partes.push('visitas até ' + fmt.longa(estado.datas.max));
-    if (estado.cruzado.dataReferencia) partes.push('retornos até ' + fmt.longa(estado.cruzado.dataReferencia));
+    if (estado.cruzado && estado.cruzado.dataReferencia) partes.push('retornos até ' + fmt.longa(estado.cruzado.dataReferencia));
     if (estado.atualizadoEm) partes.push('atualizado às ' + estado.atualizadoEm.toLocaleTimeString('pt-BR'));
     sub.textContent = partes.join(' · ');
     sub.title = sub.textContent;
@@ -640,9 +672,18 @@
       const ex = Array.from(estado.atividades.values()).filter((a) => CV.escopo.equipeNoEscopo(a.recurso)).map((a) => a.data).filter(Boolean).sort();
       alvo.appendChild(h('p', { class: 'explica' }, h('b', { text: 'Nenhum retorno foi ligado a uma visita. ' }),
         'Há ' + fmt.int(estado.resultados.size) + ' lançamento(s) de Resultados, mas as atividades carregadas das equipes' + (ex.length ? ' vão só de ' + fmt.longa(ex[0]) + ' a ' + fmt.longa(ex[ex.length - 1]) : '') +
-        '. Coloque na pasta os arquivos de Atividades dos outros dias e clique em Atualizar. A aba Auditoria mostra, equipe por equipe, o que foi conferido.'));
+        '. Coloque na pasta os arquivos de Atividades dos outros dias e clique em Atualizar. A aba Auditoria mostra, equipe por equipe, o que foi conferido.' +
+        (PAG.id === 'vcg' ? ' Enquanto isso, o bloco “Lançamentos por equipe e tipo” (abaixo dos cards) mostra o que cada equipe lançou, direto da planilha.' : '')));
     }
     const semDado = estado.aba === 'tempos' ? !estado.agenda.length && !estado.visitas.length : !estado.visitas.length;
+    if (semDado && estado.aba === 'visao' && lancamentosDoPainel().length) {
+      // sem nenhuma atividade das equipes: só os lançamentos do formulário têm o que mostrar
+      alvo.appendChild(h('p', { class: 'explica' }, h('b', { text: 'Ainda não há atividades das equipes do VCG. ' }),
+        'Os lançamentos do formulário já aparecem abaixo, direto da planilha. Para medir a efetividade (visita executada que virou resultado), coloque na pasta os arquivos de Atividades de cada dia e clique em ',
+        h('b', { text: 'Atualizar' }), '.'));
+      alvo.appendChild(CV.ui.blocoLancamentos(lancamentosFiltrados(), ordemDe, avisoLancamentos()));
+      return;
+    }
     if (semDado && estado.aba !== 'auditoria') {
       alvo.appendChild(h('p', { class: 'explica' },
         PAG.id === 'vcg' ? 'Nenhuma atividade das equipes do VCG nos arquivos carregados. ' : 'Nenhuma visita das equipes e cidades da operação nos arquivos carregados. ',
@@ -653,6 +694,7 @@
     if (estado.aba === 'visao') {
       CV.ui.renderVisao(alvo, {
         vs: visitasFiltradas(), equipes: equipesVisiveis(), gran: granularidadeAtual(), ordemDe, abertas: estado.abertas, vcg: PAG.id === 'vcg',
+        lancamentos: PAG.id === 'vcg' ? lancamentosFiltrados() : null, avisoLancamentos: avisoLancamentos(),
         aoMudarGran: (g) => { estado.gran = g; estado.granManual = true; renderPainel(); },
       });
     } else if (estado.aba === 'tempos') {
@@ -1124,7 +1166,7 @@
       mensagem('erro', 'Este navegador é antigo demais para ler planilhas (falta DecompressionStream). Use uma versão recente do Chrome, Edge, Firefox ou Safari.');
     }
     await restaurar();
-    if (estado.atividades.size) recalcular();
+    if (estado.atividades.size || estado.resultados.size) recalcular(); // só lançamentos (VCG) também têm o que mostrar
     atualizarBotoes();
     renderTudo();
     window.CV_estado = estado; // útil para depuração no console
