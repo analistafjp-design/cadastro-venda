@@ -186,6 +186,7 @@ Cada retorno cai em exatamente um destes baldes (a Auditoria mostra os números 
 | Δ economias | Soma líquida de economias acrescidas |
 | Índice | Efetividade da linha ÷ efetividade geral (só com 10+ executadas) |
 
+- A efetividade **sempre** divide por *Exec*, nunca por *Percorrido*: a Exoc (ocorrência) é visita em que a equipe foi ao local e não executou o serviço, então não entra na conta. Por isso a tabela *Bases* mostra as duas colunas (Percorrido e Exec): com o Exec à vista, a efetividade de cada linha confere com *Com resultados ÷ Exec* (ex.: 21 com resultado ÷ 39 Exec = 53,8%, e não 21 ÷ 43 Percorrido = 48,8%).
 - As colunas de desfecho (Incremento, Categoria...) contam visitas que **incluem** aquele desfecho; uma visita pode ter mais de um, então não somam o total.
 
 **Tipos de resultado (cards e “+” de cada equipe).** Cada visita com resultado entra em um ou mais tipos:
