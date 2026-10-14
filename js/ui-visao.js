@@ -121,10 +121,12 @@
     const colsBase = [
       { id: 'base', titulo: 'Base', tipo: 'txt', valor: (l) => l.chave },
       { id: 'perc', titulo: 'Percorrido', tipo: 'num', valor: (l) => l.percorrido, dica: 'Exec + Exoc' },
+      // o Exec fica à vista: é o divisor da efetividade (sem ele, a conta não fecha com o Percorrido)
+      { id: 'exec', titulo: 'Exec', tipo: 'num', valor: (l) => l.exec, dica: 'Atividades finalizadas: o divisor da efetividade' },
       { id: 'res', titulo: 'Com resultados', tipo: 'num', valor: (l) => l.resultado },
       { id: 'taxa', titulo: 'Efetividade', tipo: 'taxa', valor: (l) => l.taxaResultado, dica: 'Com resultados ÷ Exec (visitas executadas)' },
     ];
-    const blocoBase = bloco('Bases', 'Efetividade de cada base de alvos (projeto) no período.');
+    const blocoBase = bloco('Bases', 'Efetividade de cada base de alvos (projeto) no período = Com resultados ÷ Exec. As Exoc entram no Percorrido, mas não na conta: a equipe foi ao local e não conseguiu executar o serviço.');
     blocoBase.appendChild(ui.criarTabela({ colunas: colsBase, linhas: linhasBase, ordem: ctx.ordemDe('visao-bases', { id: 'res', dir: 'desc' }), vazio: 'Nenhuma visita no período.' }));
     if (linhasBase.some((l) => l.chave === R.semProjeto)) {
       blocoBase.appendChild(h('p', { class: 'nota', text: '“' + R.semProjeto + '” são as atividades que não pertencem a uma base de alvos (pedidos do atendimento, solicitações das próprias equipes). Veja os textos na aba Auditoria.' }));
