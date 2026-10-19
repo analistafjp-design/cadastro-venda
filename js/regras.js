@@ -56,6 +56,50 @@
     },
 
     /**
+     * Aba "Tratativas": incremento e decremento de ECONOMIA (DE:/PARA:) e de CATEGORIA
+     * (ANTERIOR/ATUAL × QUANTIDADE) lançados no formulário de Resultados, valorados pela tarifa da
+     * categoria. É a mesma conta do relatório TRATATIVAS do Power BI; vem direto da planilha, sem
+     * depender das atividades. Valor = economias × tarifa (R$ por economia).
+     */
+    tratativas: {
+      /** Só entram lançamentos desta frente de serviço (começo do nome, sem acento/caixa). Vazio = todas. */
+      frente: 'CADASTRO',
+      /** R$ por economia de cada categoria. Categoria que não está aqui (ex.: "Outros") vale zero. */
+      tarifas: {
+        'Residencial': 85.41,
+        'Comercial': 443.57,
+        'Industrial': 613.17,
+        'Pública': 129.16,
+        'P. Comércio': 221.78,
+        'Comércio popular': 60.24,
+        'Social': 30.12,
+      },
+      /**
+       * Como reconhecer a categoria no texto livre ("2 Comércios", "P. Comercio", "Publica"...): a
+       * primeira linha cujo `contem` (maiúsculas, sem acento nem pontuação) aparece no texto vence.
+       * Sem nenhuma: "Outros". A ordem é a do Power BI (RES, SOC, IND, PUB antes de COM).
+       * `soCorrigido`: a linha só vale com `igualPowerBI: false`.
+       */
+      categorias: [
+        { nome: 'Residencial', contem: ['RES'] },
+        { nome: 'Social', contem: ['SOC'] },
+        { nome: 'Industrial', contem: ['IND'] },
+        { nome: 'Pública', contem: ['PUB'] },
+        { nome: 'Comércio popular', contem: ['POPULAR'], soCorrigido: true },
+        { nome: 'P. Comércio', contem: ['P COM', 'PCOM'] },
+        { nome: 'Comercial', contem: ['COM'] },
+      ],
+      /**
+       * true = os números batem com os do relatório do Power BI, inclusive dois detalhes dele que
+       * parecem erro: (1) nos quadros de CATEGORIA a "Pública" vale zero (o relatório procura
+       * "Publica", sem acento, na tabela de tarifas, que tem "PÚBLICA"); (2) "Comércio popular"
+       * é contado como "Comercial" (443,57). A aba avisa quantos lançamentos são afetados.
+       * false = corrige os dois: Pública vale 129,16 e Comércio popular tem a tarifa própria (60,24).
+       */
+      igualPowerBI: true,
+    },
+
+    /**
      * Tipos de atividade que contam como "alvo gerado para visita"
      * (comparação por chave sem acento). Lista vazia = aceita todos.
      */

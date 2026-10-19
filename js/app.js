@@ -18,8 +18,9 @@
   CV.store.usarBanco(PAG.banco);
 
   // Muda quando a leitura das planilhas passa a guardar mais coisas (ex.: horários): os dados
-  // antigos do navegador são descartados e relidos da pasta.
-  const VERSAO_DADOS = 2;
+  // antigos do navegador são descartados e relidos da pasta. A 3 (só nas páginas com a aba
+  // Tratativas) acrescenta ANTERIOR, ATUAL, QUANTIDADE e Colaborador dos Resultados.
+  const VERSAO_DADOS = PAG.tratativas ? 3 : 2;
 
   const chaveEquipe = (r) => N.chave(r).replace(/ /g, '');
 
@@ -37,8 +38,10 @@
     modelo: null,
     totalPercorrido: 0,
     datas: { min: null, max: null },
-    opcoes: { cidades: [], equipes: [], bases: [] },
-    filtros: { preset: 'mes', de: null, ate: null, cidade: null, equipe: null, base: null, semAvulsas: false },
+    tratativas: [], // lançamentos prontos para a aba Tratativas (só Interior)
+    datasTratativas: { min: null, max: null },
+    opcoes: { cidades: [], equipes: [], bases: [], assistentes: [], meses: [] },
+    filtros: { preset: 'mes', de: null, ate: null, cidade: null, equipe: null, base: null, assistente: null, semAvulsas: false },
     refs: {},
     gran: 'dia',
     granManual: false,
@@ -379,6 +382,8 @@
     estado.visitas = [];
     estado.descartadas = [];
     estado.agenda = [];
+    estado.tratativas = [];
+    estado.datasTratativas = { min: null, max: null };
     if (estado.pasta) estado.pasta.ultima = null;
     $('mensagens').textContent = '';
     renderTudo();
@@ -401,6 +406,9 @@
     estado.visitas = esc.dentro;
     estado.descartadas = esc.descartadas;
     estado.agenda = CV.tempos.agendaDe(at);
+    estado.tratativas = PAG.tratativas ? CV.tratativas.preparar(rs) : [];
+    const optTrat = CV.tratativas.opcoes(estado.tratativas);
+    estado.datasTratativas = { min: optTrat.min, max: optTrat.max };
     estado.modelo = M.criarModeloChance(estado.visitas);
     estado.totalPercorrido = M.resumo(estado.visitas).percorrido;
 
@@ -425,10 +433,13 @@
       cidades: Array.from(cid.keys()).sort(alfa),
       equipes: R.escopo.equipes.slice(),
       bases: Array.from(bas.entries()).sort((a, b) => b[1] - a[1] || alfa(a[0], b[0])).map((x) => x[0]),
+      assistentes: optTrat.assistentes,
+      meses: optTrat.meses,
     };
     const f = estado.filtros;
     if (f.cidade && !estado.opcoes.cidades.includes(f.cidade)) f.cidade = null;
     if (f.base && !estado.opcoes.bases.includes(f.base)) f.base = null;
+    if (f.assistente && !estado.opcoes.assistentes.includes(f.assistente)) f.assistente = null;
     estado.atualizadoEm = new Date();
     if (f.preset !== 'custom') aplicarPreset(f.preset); // "último dia", "7 dias"... acompanham o dado mais novo
     cacheVs = null;
@@ -442,6 +453,7 @@
 
   /** Primeiro e último dia com dado: visitas e tempos e, no VCG, também os lançamentos (que valem sem visita). */
   function limitesDatas() {
+    if (estado.aba === 'tratativas') return estado.datasTratativas; // a aba Tratativas tem as datas do próprio formulário
     let { min, max } = estado.datas;
     for (const r of lancamentosDoPainel()) {
       if (!r.data) continue;
@@ -556,9 +568,45 @@
     const campo = (rotulo, el) => h('label', { class: 'campo' }, h('span', { text: rotulo }), el);
     alvo.appendChild(campo('Data inicial', refs.de));
     alvo.appendChild(campo('Data final', refs.ate));
+    if (estado.aba === 'tratativas') {
+      // as tratativas vêm do formulário: não têm cidade, equipe nem base; filtram por mês e por assistente
+      alvo.appendChild(campo('Mês', seletorMes(refs)));
+      if (estado.opcoes.assistentes.length) alvo.appendChild(campo('Assistente', seletor('assistente', 'Assistente', 'Todos os assistentes', estado.opcoes.assistentes, false)));
+      return;
+    }
     alvo.appendChild(campo('Cidade', seletor('cidade', 'Cidade', 'Todas as cidades', estado.opcoes.cidades, semTerritorio)));
     alvo.appendChild(campo('Equipe', seletor('equipe', 'Equipe', 'Todas as equipes', estado.opcoes.equipes, false)));
     alvo.appendChild(campo('Base', seletor('base', 'Base', 'Todas as bases', estado.opcoes.bases, semTerritorio)));
+  }
+
+  /** O mês do período escolhido ('2026-10'), se as duas datas estão no mesmo mês; senão vazio. */
+  function mesDoPeriodo() {
+    const f = estado.filtros;
+    return f.de && f.ate && f.de.slice(0, 7) === f.ate.slice(0, 7) ? f.de.slice(0, 7) : '';
+  }
+
+  /** Escolher um mês é pôr as duas datas no primeiro e no último dia dele (dentro do que há de dado). */
+  function seletorMes(refs) {
+    const f = estado.filtros;
+    const sel = h('select', { attrs: { 'aria-label': 'Mês' } },
+      h('option', { value: '', text: 'Todos os meses' }),
+      estado.opcoes.meses.map((m) => h('option', { value: m, text: CV.tratativas.rotuloMes(m) })));
+    sel.value = estado.opcoes.meses.includes(mesDoPeriodo()) ? mesDoPeriodo() : '';
+    sel.addEventListener('change', () => {
+      if (!sel.value) aplicarPreset('tudo');
+      else {
+        const { min, max } = limitesDatas();
+        const [a, m] = sel.value.split('-').map(Number);
+        const ultimo = sel.value + '-' + N.p2(new Date(Date.UTC(a, m, 0)).getUTCDate());
+        f.de = min && sel.value + '-01' < min ? min : sel.value + '-01';
+        f.ate = max && ultimo > max ? max : ultimo;
+        f.preset = 'custom';
+        estado.granManual = false;
+      }
+      mudouFiltro();
+    });
+    refs.mes = sel;
+    return sel;
   }
 
   /** Reflete nos campos o que mudou por fora deles (atalhos de período, "Limpar filtros"). */
@@ -567,7 +615,8 @@
     const r = estado.refs;
     if (r.de) r.de.value = f.de || '';
     if (r.ate) r.ate.value = f.ate || '';
-    for (const k of ['cidade', 'equipe', 'base']) if (r[k]) r[k].value = f[k] || '';
+    for (const k of ['cidade', 'equipe', 'base', 'assistente']) if (r[k]) r[k].value = f[k] || '';
+    if (r.mes) r.mes.value = estado.opcoes.meses.includes(mesDoPeriodo()) ? mesDoPeriodo() : '';
   }
 
   function mudouFiltro() {
@@ -589,13 +638,15 @@
     }
     alvo.appendChild(h('span', { class: 'sep' }));
     const semTerritorio = estado.aba === 'tempos';
-    const ativos = [['equipe', 'Equipe'], ['cidade', 'Cidade'], ['base', 'Base']].filter(([k]) => f[k] && !(semTerritorio && k !== 'equipe'));
+    // cada aba mostra só os filtros que valem para ela
+    const filtrosDaAba = estado.aba === 'tratativas' ? [['assistente', 'Assistente']] : [['equipe', 'Equipe'], ['cidade', 'Cidade'], ['base', 'Base']];
+    const ativos = filtrosDaAba.filter(([k]) => f[k] && !(semTerritorio && k !== 'equipe'));
     for (const [k, rotulo] of ativos) {
       alvo.appendChild(h('span', { class: 'chip' }, rotulo + ': ' + f[k],
         h('button', { type: 'button', text: '×', title: 'Remover o filtro', attrs: { 'aria-label': 'Remover o filtro de ' + rotulo.toLowerCase() }, on: { click: () => { f[k] = null; mudouFiltro(); } } })));
     }
     if (ativos.length) {
-      alvo.appendChild(h('button', { type: 'button', class: 'chip acao', text: 'Limpar filtros', on: { click: () => { f.cidade = null; f.equipe = null; f.base = null; mudouFiltro(); } } }));
+      alvo.appendChild(h('button', { type: 'button', class: 'chip acao', text: 'Limpar filtros', on: { click: () => { for (const [k] of filtrosDaAba) f[k] = null; mudouFiltro(); } } }));
     }
     alvo.appendChild(h('span', { class: 'espaco' }));
     if (estado.aba === 'visao' || estado.aba === 'alvos') {
@@ -612,7 +663,8 @@
 
   function renderTudo() {
     const temLancamentos = lancamentosDoPainel().length > 0; // VCG: os lançamentos já dizem o que as equipes trouxeram
-    const temDados = !!(estado.cruzado && (estado.cruzado.visitas.length || estado.agenda.length)) || temLancamentos;
+    // Interior: as tratativas também valem só com a planilha de Resultados, sem nenhuma atividade
+    const temDados = !!(estado.cruzado && (estado.cruzado.visitas.length || estado.agenda.length)) || temLancamentos || estado.tratativas.length > 0;
     $('vazio').hidden = temDados;
     $('app').hidden = !temDados;
     $('abas').hidden = !temDados;
@@ -644,15 +696,27 @@
     renderPainel();
   }
 
-  const ABAS = [['visao', 'Visão geral'], ['tempos', 'Tempos das equipes'], ['alvos', 'Novos alvos'], ['auditoria', 'Auditoria']];
+  const ABAS = [['visao', 'Visão geral'], ['tempos', 'Tempos das equipes'], ['tratativas', 'Tratativas'], ['alvos', 'Novos alvos'], ['auditoria', 'Auditoria']];
+
+  /** Troca de aba. Os atalhos de período (7 dias, Mês...) valem para o dado de cada aba: são refeitos. */
+  function abrirAba(id) {
+    estado.aba = id;
+    if (estado.filtros.preset !== 'custom') aplicarPreset(estado.filtros.preset);
+    cacheVs = null;
+    montarFiltros();
+    renderAbas();
+    renderChips();
+    renderPainel();
+  }
 
   function renderAbas() {
     const alvo = $('abas');
     alvo.textContent = '';
     for (const [id, nome] of ABAS) {
+      if (id === 'tratativas' && !PAG.tratativas) continue;
       alvo.appendChild(h('button', {
         type: 'button', role: 'tab', text: nome, attrs: { 'aria-selected': String(estado.aba === id) },
-        on: { click: () => { estado.aba = id; montarFiltros(); renderAbas(); renderChips(); renderPainel(); } },
+        on: { click: () => abrirAba(id) },
       }));
     }
   }
@@ -667,6 +731,7 @@
           ? ['Coloque na pasta o arquivo ', h('b', { text: 'Resultados VCG' }), ' (o nome precisa ter “VCG”) e clique em ', h('b', { text: 'Atualizar' }), '. Sem ele, só aparecem as visitas e os tempos.']
           : 'Coloque a planilha de Resultados na pasta e clique em Atualizar. Sem ela, só aparecem as visitas e os tempos.'));
     }
+    if (estado.aba === 'tratativas') { renderTratativas(alvo); return; } // vem só dos Resultados: não depende de visitas
     if (estado.aba === 'visao' && estado.resultados.size && estado.cruzado && estado.cruzado.auditoria.atribuidos === 0 && estado.visitas.length) {
       // há retornos, mas nenhum caiu numa visita: quase sempre é falta de atividades de outros dias
       const ex = Array.from(estado.atividades.values()).filter((a) => CV.escopo.equipeNoEscopo(a.recurso)).map((a) => a.data).filter(Boolean).sort();
@@ -713,6 +778,27 @@
   function segmentado(opcoes, atual, aoMudar, rotulo) {
     return h('div', { class: 'segmentado', role: 'group', 'aria-label': rotulo || null },
       opcoes.map(([id, nome]) => h('button', { type: 'button', text: nome, attrs: { 'aria-pressed': String(atual === id) }, on: { click: () => aoMudar(id) } })));
+  }
+
+  // ---- Tratativas (incremento e decremento de economia e de categoria, em R$)
+
+  /** Os lançamentos da aba no período e no assistente escolhidos. */
+  const tratativasFiltradas = () => CV.tratativas.filtrar(estado.tratativas, { de: estado.filtros.de, ate: estado.filtros.ate, assistente: estado.filtros.assistente });
+
+  function renderTratativas(alvo) {
+    if (!estado.tratativas.length) {
+      if (estado.resultados.size) {
+        alvo.appendChild(h('p', { class: 'explica' }, h('b', { text: 'Nenhum lançamento da frente “' + R.tratativas.frente + '” nos Resultados carregados. ' }),
+          'Esta aba lê as colunas DE:, PARA:, ANTERIOR, ATUAL, QUANTIDADE e TIPO DE ALTERAÇÃO do formulário de Resultados. A frente de serviço considerada fica em ',
+          h('code', { text: 'tratativas' }), ' no arquivo ', h('code', { text: 'js/regras.js' }), '.'));
+      }
+      return;
+    }
+    CV.ui.renderTratativas(alvo, {
+      analise: CV.tratativas.analisar(tratativasFiltradas()),
+      meses: CV.tratativas.porMes(estado.tratativas, { assistente: estado.filtros.assistente }),
+      ordemDe,
+    });
   }
 
   function ordemDe(id, padrao) {
@@ -773,7 +859,27 @@
     return baixarExcel(PAG.prefixoArquivo + nome + '_' + hojeTxt(), [aba, CV.exporta.abaFiltros(descricaoFiltros(true))]);
   }
 
+  /** Tratativas: os quatro quadros, o saldo por mês e uma linha por lançamento com o valor e a observação. */
+  function exportarTratativas() {
+    const f = estado.filtros;
+    const linhas = tratativasFiltradas();
+    const filtros = [
+      ['Período', f.de || f.ate ? (f.de ? fmt.longa(f.de) : 'início') + ' a ' + (f.ate ? fmt.longa(f.ate) : 'último dia') : 'Todo o período'],
+      ['Assistente', f.assistente || 'Todos'],
+      ['Frente de serviço', R.tratativas.frente || 'Todas'],
+      ['Tarifas (R$ por economia)', Object.entries(R.tratativas.tarifas).map(([c, t]) => c + ' ' + fmt.dec2(t)).join(' · ')],
+      ['Igual ao Power BI', R.tratativas.igualPowerBI === false ? 'Não (Pública e Comércio popular corrigidos)' : 'Sim'],
+    ];
+    return baixarExcel('tratativas_' + periodoTxt(), [
+      CV.exporta.abaQuadros(CV.tratativas.analisar(linhas)),
+      CV.exporta.abaMeses(CV.tratativas.porMes(estado.tratativas, { assistente: f.assistente })),
+      CV.exporta.abaTratativas(CV.tratativas.detalhe(linhas)),
+      CV.exporta.abaFiltros(filtros),
+    ]);
+  }
+
   function exportarAtual() {
+    if (estado.aba === 'tratativas') return exportarTratativas();
     if (estado.aba === 'tempos') return exportarTempos();
     if (estado.aba === 'alvos' && estado.exportaAlvo) return estado.exportaAlvo();
     return exportarCruzamento();
@@ -1173,7 +1279,7 @@
     // pasta lembrada e com acesso ainda válido: já traz o que for novo, sem precisar clicar
     if (estado.pasta && temSeletorDePasta() && (await permissaoDaPasta(false))) await lerPasta(true);
     if (estado.precisaRelerPasta && !estado.atividades.size) {
-      mensagem('aviso', 'O painel foi atualizado (agora com horários, equipes e cidades). Os dados guardados antes precisam ser lidos de novo: clique em “' + (estado.pasta ? 'Atualizar' : 'Carregar pasta') + '”.');
+      mensagem('aviso', 'O painel foi atualizado (agora com horários, equipes, cidades e tratativas). Os dados guardados antes precisam ser lidos de novo: clique em “' + (estado.pasta ? 'Atualizar' : 'Carregar pasta') + '”.');
     }
   }
 

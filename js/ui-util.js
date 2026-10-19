@@ -42,8 +42,13 @@
 
   const nfInt = new Intl.NumberFormat('pt-BR');
   const nf1 = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const nf2 = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const nfBrl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
   const fmt = {
+    /** R$ 1.774,28 · -R$ 1.281,15 (sempre 2 casas; o zero negativo vira zero) */
+    brl: (n) => (n === null || n === undefined ? '–' : nfBrl.format(Object.is(n, -0) ? 0 : n)),
+    dec2: (x) => (x === null || x === undefined ? '–' : nf2.format(x)),
     int: (n) => (n === null || n === undefined ? '–' : nfInt.format(n)),
     sinal: (n) => (n === null || n === undefined ? '–' : (n > 0 ? '+' : '') + nfInt.format(n)),
     pct: (x) => (x === null || x === undefined ? '–' : nf1.format(x * 100) + '%'),

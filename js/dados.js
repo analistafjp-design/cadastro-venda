@@ -50,6 +50,11 @@
     para: ['PARA:'],
     tratativa: ['TRATATIVA CADASTRAL'],
     tipoAlt: ['TIPO DE ALTERAÇÃO'],
+    // aba Tratativas (categoria antes/depois e quem lançou)
+    anterior: ['ANTERIOR'],
+    atual: ['ATUAL'],
+    qtd: ['QUANTIDADE'],
+    colaborador: ['Colaborador'],
   };
   const OBRIGATORIOS_RESULTADOS = ['id', 'mat', 'inicio'];
 
@@ -239,12 +244,28 @@
     };
   }
 
+  /** Número de uma célula ("2", 2, "2,0"); null se estiver vazia ou não for número. */
+  function numeroSimples(v) {
+    if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+    const t = N().texto(v);
+    if (t === null || !/^\d+(?:[.,]\d+)?$/.test(t)) return null;
+    return Number(t.replace(',', '.'));
+  }
+
+  /** Primeiro nome de quem lançou ("Maria Souza" -> "Maria"): o "Assistente" do relatório. */
+  function primeiroNome(v) {
+    const t = N().texto(v);
+    return t ? t.split(/\s+/)[0] : null;
+  }
+
   function limparResultado(r, layout) {
     if (layout === 'vcg') return limparResultadoVcg(r);
     const mat = N().matricula(r.mat);
     return {
       id: N().texto(r.id) === null ? null : String(r.id).replace(/\.0+$/, ''),
       data: N().data(r.inicio) || N().data(r.fim),
+      // a aba Tratativas usa a data de CONCLUSÃO do formulário (como o relatório); sem ela, vale a de início
+      dataFim: N().data(r.fim),
       mat: mat.mat,
       matBruta: mat.bruto,
       frente: N().texto(r.frente),
@@ -254,6 +275,10 @@
       para: cortar(N().texto(r.para), 80),
       tratativa: N().texto(r.tratativa),
       tipoAlt: cortar(N().texto(r.tipoAlt), 140),
+      anterior: cortar(N().texto(r.anterior), 60),
+      atual: cortar(N().texto(r.atual), 60),
+      qtd: numeroSimples(r.qtd),
+      assistente: primeiroNome(r.colaborador),
     };
   }
 

@@ -110,6 +110,73 @@
     };
   }
 
+  /** Tratativas: um evento de valor por linha (o lançamento, o quadro em que caiu, as categorias e o R$). */
+  function abaTratativas(detalhe) {
+    const eco = (x) => x.quadro.tipo === 'economia';
+    return {
+      nome: 'Tratativas',
+      colunas: [
+        { titulo: 'Data', tipo: 'data', valor: (x) => x.l.data },
+        { titulo: 'Id', tipo: 'int', valor: (x) => x.l.id },
+        { titulo: 'Matrícula', tipo: 'int', valor: (x) => x.l.mat },
+        { titulo: 'Assistente', valor: (x) => x.l.assistente },
+        { titulo: 'Frente de Serviço', valor: (x) => x.l.frente },
+        { titulo: 'Quadro', valor: (x) => x.quadro.titulo },
+        { titulo: 'De / Anterior', valor: (x) => x.v.de },
+        { titulo: 'Para / Atual', valor: (x) => x.v.para },
+        { titulo: 'Economias', tipo: 'num', valor: (x) => x.v.n },
+        { titulo: 'Valor (R$)', tipo: 'num', valor: (x) => x.valor },
+        { titulo: 'DE:', valor: (x) => (eco(x) ? x.l.eco.deTxt : null) },
+        { titulo: 'PARA:', valor: (x) => (eco(x) ? x.l.eco.paraTxt : null) },
+        { titulo: 'ANTERIOR', valor: (x) => (eco(x) ? null : x.l.cat.anteriorTxt) },
+        { titulo: 'ATUAL', valor: (x) => (eco(x) ? null : x.l.cat.atualTxt) },
+        { titulo: 'QUANTIDADE', tipo: 'num', valor: (x) => (eco(x) ? null : x.l.cat.qtd) },
+        { titulo: 'Observação', valor: (x) => x.obs },
+      ],
+      linhas: detalhe,
+    };
+  }
+
+  /** Tratativas: os quatro quadros como na tela (grupos, total de cada um e o saldo). */
+  function abaQuadros(analise) {
+    const linhas = [];
+    for (const q of CV.tratativas.QUADROS) {
+      const d = analise.quadros[q.id];
+      for (const g of d.linhas) linhas.push({ quadro: q.titulo, frente: g.frente, a: g.de, b: g.para, n: g.n, valor: g.valor });
+      linhas.push({ quadro: q.titulo, frente: 'Total', a: null, b: null, n: d.n, valor: d.valor });
+    }
+    linhas.push({ quadro: 'Saldo do período', frente: null, a: null, b: null, n: null, valor: analise.saldo });
+    return {
+      nome: 'Quadros',
+      colunas: [
+        { titulo: 'Quadro', valor: (l) => l.quadro },
+        { titulo: 'Frente de Serviço', valor: (l) => l.frente },
+        { titulo: 'De / Anterior', valor: (l) => l.a },
+        { titulo: 'Para / Atual', valor: (l) => l.b },
+        { titulo: 'Economias', tipo: 'num', valor: (l) => l.n },
+        { titulo: 'Valor (R$)', tipo: 'num', valor: (l) => l.valor },
+      ],
+      linhas,
+    };
+  }
+
+  /** Tratativas: o saldo de cada mês. */
+  function abaMeses(meses) {
+    return {
+      nome: 'Saldo por mês',
+      colunas: [
+        { titulo: 'Mês', valor: (m) => m.rotulo },
+        { titulo: 'Incremento de economia', tipo: 'num', valor: (m) => m.incEco },
+        { titulo: 'Incremento de categoria', tipo: 'num', valor: (m) => m.incCat },
+        { titulo: 'Decremento de economia', tipo: 'num', valor: (m) => m.decEco },
+        { titulo: 'Decremento de categoria', tipo: 'num', valor: (m) => m.decCat },
+        { titulo: 'Saldo', tipo: 'num', valor: (m) => m.saldo },
+        { titulo: 'Vs. mês anterior', tipo: 'num', valor: (m) => m.variacao },
+      ],
+      linhas: meses,
+    };
+  }
+
   /** Aba "Filtros": o recorte que gerou o arquivo. */
   function abaFiltros(pares) {
     return {
@@ -119,6 +186,6 @@
     };
   }
 
-  CV.exporta = { colunasAtividade, colunasCruzamento, abaVisitas, abaAgenda, abaDias, abaFiltros, rotulosDeResultado };
+  CV.exporta = { colunasAtividade, colunasCruzamento, abaVisitas, abaAgenda, abaDias, abaTratativas, abaQuadros, abaMeses, abaFiltros, rotulosDeResultado };
   if (typeof module !== 'undefined' && module.exports) module.exports = CV.exporta;
 })(typeof window !== 'undefined' ? window : globalThis);

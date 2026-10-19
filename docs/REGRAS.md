@@ -38,6 +38,7 @@ Os arquivos são lidos **pelo nome do cabeçalho** (sem diferenciar maiúsculas,
 | FRENTE DE SERVIÇO | Permite excluir frentes (ex.: Bairro Legal) na Auditoria |
 | TIPO DE ORDEM DE SERVIÇO, QUAL FOI A ALTERAÇÃO DE ECONOMIA?, TRATATIVA CADASTRAL, TIPO DE ALTERAÇÃO | Definem o desfecho |
 | DE:, PARA: | Quantas economias foram acrescidas/retiradas |
+| Hora de conclusão, ANTERIOR, ATUAL, QUANTIDADE, Colaborador | Só da aba **Tratativas** (§ 6.4): data de conclusão, categoria antes/depois, quantas economias mudaram e quem lançou (o primeiro nome vira o *Assistente*). São opcionais: sem elas a aba fica em branco, o resto não muda |
 
 ## 1.1 Escopo do painel
 
@@ -221,7 +222,42 @@ A aba mostra a **média por dia trabalhado** ou o **total do período**. Como o 
 
 ## 6.3 Exportação (Excel)
 
-Todo arquivo exportado é `.xlsx`, uma linha por atividade, com as colunas da planilha de Atividades (`Recurso`, `Data`, `ID da Atividade`, `Cód. Protocolo Origem`, `Matrícula`, `Status da Atividade`, `Tipo de Atividade`, `Observação`, `Cidade`, `Bairro`, `Área de Trabalho`, `Endereço`, `Motivo de Não Execução - Normal`, `Categoria`, `Quantidade De Economia`, `Situação Do Imóvel`, `Início`, `Fim`, `Duração`, `Tempo de Deslocamento`) mais: `Projeto (base)`, `Situação da visita`, `Percorrido`, `Retornos do backoffice`, `Grupo do retorno`, `Com resultado`, `Tipo de resultado`, `Desfechos do retorno`, `Δ economias`, `Data do 1º retorno`, `Dias até o retorno` e `Em maturação`. Datas e horários saem como data/hora do Excel, matrícula e ID como número, texto sempre como texto. A aba *Filtros* guarda o período, a equipe, a cidade e a base usados.
+Todo arquivo exportado é `.xlsx`, uma linha por atividade, com as colunas da planilha de Atividades (`Recurso`, `Data`, `ID da Atividade`, `Cód. Protocolo Origem`, `Matrícula`, `Status da Atividade`, `Tipo de Atividade`, `Observação`, `Cidade`, `Bairro`, `Área de Trabalho`, `Endereço`, `Motivo de Não Execução - Normal`, `Categoria`, `Quantidade De Economia`, `Situação Do Imóvel`, `Início`, `Fim`, `Duração`, `Tempo de Deslocamento`) mais: `Projeto (base)`, `Situação da visita`, `Percorrido`, `Retornos do backoffice`, `Grupo do retorno`, `Com resultado`, `Tipo de resultado`, `Desfechos do retorno`, `Δ economias`, `Data do 1º retorno`, `Dias até o retorno` e `Em maturação`. Datas e horários saem como data/hora do Excel, matrícula e ID como número, texto sempre como texto. A aba *Filtros* guarda o período, a equipe, a cidade e a base usados. A aba Tratativas exporta o próprio formato (§ 6.4).
+
+## 6.4 Aba Tratativas (incremento e decremento, em R$)
+
+Reproduz a página *TRATATIVAS* do relatório do Power BI. Vem **direto da planilha de Resultados** (não usa atividades nem o cruzamento por matrícula, então funciona só com ela) e existe **só na página Interior** (o formulário do VCG não tem DE/PARA nem ANTERIOR/ATUAL). Só entram lançamentos da frente de serviço `Cadastro` (`tratativas.frente`); a data é a da **conclusão** do formulário (`Hora de conclusão`; sem ela, a de início). Linhas repetidas (mesmo `Id`) valem uma vez, como em todo o painel.
+
+**Tarifa** = R$ por economia (`tratativas.tarifas`): Residencial 85,41 · Comercial 443,57 · Industrial 613,17 · Pública 129,16 · P. Comércio 221,78 · Comércio popular 60,24 · Social 30,12. Categoria sem tarifa ("Outros": *sem fins lucrativos*, *Bairro Legal*...) vale zero. A categoria é reconhecida no texto livre por trechos (`categorias`: RES, SOC, IND, PUB, P COM, COM), na ordem do relatório.
+
+| Quadro | Quais lançamentos | Valor |
+|---|---|---|
+| **Incremento de economia** | `DE:` e `PARA:` com número no começo (`2 Residências`) e PARA > DE, sem estar marcado como *Decremento* e com a categoria de origem reconhecida | (PARA − DE) × tarifa da categoria de PARA |
+| **Decremento de economia** | PARA < DE (qualquer rótulo) | (PARA − DE) × tarifa; se DE e PARA são de categorias diferentes, (PARA − DE) × (tarifa DE − tarifa PARA), como no relatório |
+| **Incremento de categoria** | `ANTERIOR` e `ATUAL` com `QUANTIDADE` preenchida e resultado positivo | QUANTIDADE × (tarifa ATUAL − tarifa ANTERIOR) |
+| **Decremento de categoria** | o mesmo, com resultado negativo | idem (valor negativo) |
+
+Os quadros agrupam por frente de serviço, De/Anterior e Para/Atual, com o total de cada um. **Saldo** = soma dos quatro. Os valores são somados em centavos inteiros (sem erro de ponto flutuante).
+
+**Cards:** *Acumulado* = lançamentos com tratativa feita (`TIPO DE ALTERAÇÃO` preenchido e diferente de ";", "." e de qualquer texto com "sem tratativa" ou "encerrado": o *Total Tratado* do relatório); *Dias com tratativa* = dias distintos; *Média por dia* = Acumulado ÷ dias.
+
+**Saldo por mês:** todos os meses com lançamento, lado a lado, com a variação sobre o mês anterior. Só o filtro de assistente vale ali (o de período não): substitui a soma feita à mão de cada mês. **Filtros da aba:** datas e atalhos de período, *Mês* (põe as datas no primeiro e no último dia do mês) e *Assistente* (primeiro nome de `Colaborador`). Cidade, equipe e base não se aplicam e não aparecem.
+
+### Onde o painel difere do relatório (e onde copia o que parece erro)
+
+Conferido contra os dados do próprio relatório (17,6 mil linhas): mês a mês, assistente a assistente e dia a dia os quadros fecham ao centavo (Setembro/2026 = R$ 6.263,06, o mesmo valor digitado no relatório), com **estas exceções**:
+
+- **Linhas repetidas** (mesmo `Id`) são contadas uma vez; o relatório as conta duas (Abril/2026 sai R$ 170,82 menor).
+- **Filtro por grupo.** O relatório esconde um grupo De/Para inteiro quando a soma líquida das economias dele no período não é positiva (um lançamento errado de −2 apaga um +1 do mesmo grupo). O painel decide linha a linha. Nos dados reais isso só muda 3 dias soltos e nenhum mês.
+- **`igualPowerBI: true` (padrão)** copia dois detalhes do relatório que parecem erro, para os números baterem; a aba avisa quantos lançamentos são afetados:
+  1. nos quadros de **categoria** a *Pública* vale **zero** (o relatório procura `Publica`, sem acento, na tabela de tarifas, que tem `PÚBLICA`; a Pública dos quadros de economia funciona);
+  2. **Comércio popular** é contado como *Comercial* (443,57) em vez de ter a tarifa própria (60,24): `P. Comércio → Comércio popular` aparece como incremento de +221,79 quando, pela tarifa, é um decremento de −161,54.
+
+  Com `igualPowerBI: false` os dois são corrigidos (Pública = 129,16 e Comércio popular = 60,24) e os números deixam de bater com os do relatório.
+
+**Conferência dos dados** (rodapé da aba e coluna *Observação* do Excel): lançamentos de outra frente que ficam de fora; marcados como *Incremento* com PARA < DE (entram no decremento); marcados como *Decremento* com PARA > DE (ficam de fora); DE e PARA de categorias diferentes; categoria sem tarifa; categoria alterada **sem QUANTIDADE** (valor zero); e os dois itens do `igualPowerBI`. Nenhum é corrigido sozinho: o painel só mostra onde estão.
+
+**Excel:** abas *Quadros* (grupos, totais e saldo), *Saldo por mês*, *Tratativas* (uma linha por evento de valor: data, Id, matrícula, assistente, quadro, categorias, economias, valor em R$, textos de DE/PARA/ANTERIOR/ATUAL e *Observação*) e *Filtros* (com as tarifas usadas).
 
 ## 7. Listas de novos alvos
 
