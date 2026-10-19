@@ -369,28 +369,44 @@ test('formato em reais: duas casas, vírgula e negativo com sinal', () => {
   assert.equal(CV.ui.fmt.dec2(7.5833), '7,58');
 });
 
-test('tela: os quatro quadros com as mesmas colunas do relatório e o total de cada um', async () => {
+test('tela: os quatro quadros, sem a coluna da frente (uma só), com o total de cada um na base', async () => {
   const alvo = await desenhar();
   const q = (titulo) => textoTabela(secao(alvo, titulo));
 
   const inc = q('Incremento de economia');
-  assert.deepEqual(inc[0], ['Frente de serviço', 'De', 'Para', 'Incremento', 'Valor incremento']);
-  assert.deepEqual(inc[inc.length - 1], ['Total', '', '', '7', 'R$ 1.314,19']); // o total fica embaixo, como no relatório
+  assert.deepEqual(inc[0], ['De', 'Para', 'Incremento', 'Valor incremento']);
+  assert.deepEqual(inc[inc.length - 1], ['Total', '', '7', 'R$ 1.314,19']); // o total fica embaixo, como no relatório
   assert.notEqual(inc[1][0], 'Total');
-  assert.ok(inc.some((l) => l.join('|') === 'Cadastro|Residencial|Residencial|5|R$ 427,05'));
+  assert.ok(inc.some((l) => l.join('|') === 'Residencial|Residencial|5|R$ 427,05'));
 
   const dec = q('Decremento de economia');
-  assert.deepEqual(dec[0], ['Frente de serviço', 'De', 'Para', 'Decremento', 'Valor decremento']);
-  assert.deepEqual(dec[dec.length - 1], ['Total', '', '', '-5', '-R$ 341,64']);
+  assert.deepEqual(dec[0], ['De', 'Para', 'Decremento', 'Valor decremento']);
+  assert.deepEqual(dec[dec.length - 1], ['Total', '', '-5', '-R$ 341,64']);
 
   const ic = q('Incremento de categoria');
-  assert.deepEqual(ic[0], ['Frente de serviço', 'Anterior', 'Atual', 'Total', 'Valor incremento']);
-  assert.deepEqual(ic[ic.length - 1], ['Total', '', '', '24', 'R$ 2.887,58']);
+  assert.deepEqual(ic[0], ['Anterior', 'Atual', 'Total', 'Valor incremento']);
+  assert.deepEqual(ic[ic.length - 1], ['Total', '', '24', 'R$ 2.887,58']);
 
   const dc = q('Decremento de categoria');
-  assert.deepEqual(dc[0], ['Frente de serviço', 'Anterior', 'Atual', 'Total', 'Valor decremento']);
-  assert.deepEqual(dc[dc.length - 1], ['Total', '', '', '41', '-R$ 4.017,29']);
-  assert.ok(dc.some((l) => l.join('|') === 'Cadastro|Residencial|Social|31|-R$ 1.713,99'));
+  assert.deepEqual(dc[0], ['Anterior', 'Atual', 'Total', 'Valor decremento']);
+  assert.deepEqual(dc[dc.length - 1], ['Total', '', '41', '-R$ 4.017,29']);
+  assert.ok(dc.some((l) => l.join('|') === 'Residencial|Social|31|-R$ 1.713,99'));
+});
+
+test('tela: se algum dia houver mais de uma frente, a coluna "Frente de serviço" volta (em todos os quadros)', async () => {
+  const { lr } = await carregar();
+  await comRegra({ frente: '' }, async () => {
+    instalar();
+    const alvo = document.createElement('div');
+    CV.ui.renderTratativas(alvo, { analise: T.analisar(T.filtrar(T.preparar(lr.limpas), SET)), meses: [], ordemDe: (id, padrao) => Object.assign({}, padrao) });
+    for (const [titulo, colA] of [['Incremento de economia', 'De'], ['Decremento de economia', 'De'], ['Incremento de categoria', 'Anterior'], ['Decremento de categoria', 'Anterior']]) {
+      const t = textoTabela(secao(alvo, titulo));
+      assert.deepEqual(t[0].slice(0, 2), ['Frente de serviço', colA], titulo);
+    }
+    const dec = textoTabela(secao(alvo, 'Decremento de economia'));
+    assert.ok(dec.some((l) => l[0] === 'Bairro Legal - VCG')); // a frente que antes ficava de fora
+    assert.equal(dec[dec.length - 1][0], 'Total');
+  });
 });
 
 test('tela: o total é a última linha de cada quadro e fica fixo na base; as outras tabelas mantêm o total no topo', async () => {
@@ -406,19 +422,27 @@ test('tela: o total é a última linha de cada quadro e fica fixo na base; as ou
   assert.deepEqual(ls.map((l) => l[0]), ['A', 'Total', 'x', 'y']);
 });
 
-test('tela: cards, saldo em destaque, saldo por mês e conferência', async () => {
+test('tela: resumo do período (saldo, incrementos, decrementos), saldo por mês e conferência', async () => {
   const alvo = await desenhar();
-  const txt = alvo.textContent.replace(/ /g, ' ');
-  // cards de tratativas
+  const txt = alvo.textContent.replace(/\u00a0/g, ' ');
+  // pé do resumo: números de tratativas
   assert.match(txt, /Acumulado6/);
   assert.match(txt, /Dias com tratativa4/);
   assert.match(txt, /Média por dia1,50/);
-  // cards de valor e o saldo (negativo, em vermelho)
+  // os quatro valores e o saldo (negativo, em vermelho)
   assert.match(txt, /Incremento de economiaR\$ 1\.314,19/);
   assert.match(txt, /Decremento de categoria-R\$ 4\.017,29/);
-  const heroi = alvo.achar((n) => /\bheroi\b/.test(n.className))[0];
-  assert.ok(heroi.textContent.replace(/ /g, ' ').includes('-R$ 157,16'));
-  assert.ok(heroi.achar((n) => /\bneg\b/.test(n.className)).length > 0);
+  const resumo = alvo.achar((n) => /\bresumo\b/.test(n.className))[0];
+  const saldo = resumo.achar((n) => /\br-saldo\b/.test(n.className))[0];
+  assert.ok(saldo.textContent.replace(/\u00a0/g, ' ').includes('-R$ 157,16'));
+  assert.ok(saldo.achar((n) => /\bneg\b/.test(n.className)).length > 0);
+  // incrementos à esquerda e decrementos à direita, como os quadros logo abaixo
+  const grupos = resumo.achar((n) => /\br-grupo\b/.test(n.className));
+  assert.deepEqual(grupos.map((g) => g.className), ['r-grupo inc', 'r-grupo dec']);
+  assert.match(grupos[0].textContent, /^Incrementos.*Incremento de economia.*Incremento de categoria/);
+  assert.match(grupos[1].textContent, /^Decrementos.*Decremento de economia.*Decremento de categoria/);
+  assert.match(grupos[0].textContent, /7 economia\(s\)/);
+  assert.match(grupos[1].textContent, /5 economia\(s\)/); // o decremento conta economias a menos: 5, sem o sinal
   // saldo por mês: do mais novo ao mais antigo
   const meses = textoTabela(secao(alvo, 'Saldo por mês'));
   assert.deepEqual(meses[0], ['Mês', 'Incremento de economia', 'Incremento de categoria', 'Decremento de economia', 'Decremento de categoria', 'Saldo', 'Vs. mês anterior']);
@@ -432,6 +456,37 @@ test('tela: cards, saldo em destaque, saldo por mês e conferência', async () =
   assert.match(conf.textContent, /Categoria Pública valendo zero, igual ao Power BI/);
   assert.match(conf.textContent, /Comércio popular contado como Comercial/);
   assert.match(conf.textContent, /igualPowerBI: false/);
+});
+
+test('tela: incrementos na coluna da esquerda e decrementos na da direita, economia sobre categoria', async () => {
+  const alvo = await desenhar();
+  const grade = alvo.achar((n) => /\bgrade-quadros\b/.test(n.className))[0];
+  const colunas = grade.achar((n) => /\bcol-quadros\b/.test(n.className));
+  assert.equal(colunas.length, 2);
+  const titulos = (c) => c.porTag('h2').map((x) => x.textContent);
+  assert.deepEqual(titulos(colunas[0]), ['Incremento de economia', 'Incremento de categoria']);
+  assert.deepEqual(titulos(colunas[1]), ['Decremento de economia', 'Decremento de categoria']);
+});
+
+test('tela: a coluna do valor traz uma barra proporcional, na mesma escala nos quatro quadros', async () => {
+  const alvo = await desenhar();
+  const larguras = [];
+  for (const titulo of ['Incremento de economia', 'Decremento de economia', 'Incremento de categoria', 'Decremento de categoria']) {
+    const linhas = secao(alvo, titulo).porTag('tr').slice(1); // sem o cabeçalho
+    const total = linhas[linhas.length - 1];
+    assert.equal(total.achar((n) => /\bvalor-barra\b/.test(n.className)).length, 0, titulo + ': o total não tem barra');
+    for (const tr of linhas.slice(0, -1)) {
+      const barra = tr.achar((n) => /\bvalor-barra\b/.test(n.className))[0];
+      assert.ok(barra, titulo);
+      const i = barra.achar((n) => n.tagName === 'I')[0];
+      const valor = barra.textContent.replace(/\u00a0/g, ' ');
+      assert.equal(/^-/.test(valor), /\bn\b/.test(i.className), titulo + ': vermelho só no negativo');
+      larguras.push({ v: Math.abs(Number(valor.replace(/[^\d,]/g, '').replace(',', '.'))), pct: parseFloat(i.style.width) });
+    }
+  }
+  const maior = larguras.reduce((m, x) => (x.v > m.v ? x : m));
+  assert.equal(maior.pct, 100); // o maior R$ de todos os quadros enche a barra
+  for (const x of larguras) assert.ok(Math.abs(x.pct - (100 * x.v) / maior.v) < 0.1, 'proporcional: ' + x.v);
 });
 
 test('tela: sem lançamentos no período os quadros dizem isso e a conferência some', async () => {

@@ -243,9 +243,9 @@ Isso difere de quem limpa o formulário à mão (como a cópia usada no Power BI
 
 **Variação suspeita.** Um único lançamento que acrescenta ou tira `variacaoSuspeita` economias (10) ou mais vai para a *Conferência* com o `Id`: costuma ser digitação errada (`100 RES.` no lugar de `1 RES.` valeu −99 economias, R$ 8.455,59, em Abril). O painel só avisa; o número continua valendo.
 
-Os quadros agrupam por frente de serviço, De/Anterior e Para/Atual, com o total de cada um. **Saldo** = soma dos quatro. Os valores são somados em centavos inteiros (sem erro de ponto flutuante).
+Os quadros agrupam por De/Anterior e Para/Atual, com o total de cada um na base (a coluna *Frente de serviço* só aparece se algum dia houver mais de uma frente nos dados). Na tela, **incrementos à esquerda** (economia sobre categoria) e **decrementos à direita**; a coluna do valor traz uma barra proporcional (azul soma, vermelho tira), na mesma escala nos quatro quadros. **Saldo** = soma dos quatro. Os valores são somados em centavos inteiros (sem erro de ponto flutuante).
 
-**Cards:** *Acumulado* = lançamentos com tratativa feita (`TIPO DE ALTERAÇÃO` preenchido e diferente de ";", "." e de qualquer texto com "sem tratativa" ou "encerrado": o *Total Tratado* do relatório); *Dias com tratativa* = dias distintos; *Média por dia* = Acumulado ÷ dias.
+**Resumo do período** (uma faixa compacta no topo): o **saldo**, os incrementos e os decrementos (R$ e nº de economias) e, no pé, *Acumulado* = lançamentos com tratativa feita (`TIPO DE ALTERAÇÃO` preenchido e diferente de ";", "." e de qualquer texto com "sem tratativa" ou "encerrado": o *Total Tratado* do relatório); *Dias com tratativa* = dias distintos; *Média por dia* = Acumulado ÷ dias.
 
 **Saldo por mês:** todos os meses com lançamento, lado a lado, com a variação sobre o mês anterior. Só o filtro de assistente vale ali (o de período não): substitui a soma feita à mão de cada mês. **Filtros da aba:** datas e atalhos de período, *Mês* (põe as datas no primeiro e no último dia do mês) e *Assistente* (primeiro nome de `Colaborador`). Cidade, equipe e base não se aplicam e não aparecem.
 
