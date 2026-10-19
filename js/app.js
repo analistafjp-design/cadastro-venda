@@ -41,7 +41,7 @@
     tratativas: [], // lançamentos prontos para a aba Tratativas (só Interior)
     datasTratativas: { min: null, max: null },
     opcoes: { cidades: [], equipes: [], bases: [], assistentes: [], meses: [] },
-    filtros: { preset: '30', de: null, ate: null, cidade: null, equipe: null, base: null, assistente: null, semAvulsas: false },
+    filtros: { preset: 'mes', de: null, ate: null, cidade: null, equipe: null, base: null, assistente: null, semAvulsas: false },
     refs: {},
     gran: 'dia',
     granManual: false,

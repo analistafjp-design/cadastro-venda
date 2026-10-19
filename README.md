@@ -48,7 +48,7 @@ O botão **Painel VCG** (no topo do Interior) abre a página do VCG, e **Painel 
 
 ## O que o painel mostra
 
-Cinco abas (a de Tratativas só no Interior), no estilo do painel de Pós-Corte (cards, tabelas limpas, claro/escuro). Os filtros do topo (data inicial/final, cidade, equipe, base) e os atalhos *Último dia · 7 dias · 30 dias · Mês · Tudo* valem para a aba aberta.
+Cinco abas (a de Tratativas só no Interior), no estilo do painel de Pós-Corte (cards, tabelas limpas, claro/escuro). Os filtros do topo (data inicial/final, cidade, equipe, base) e os atalhos *Último dia · 7 dias · 30 dias · Mês · Tudo* valem para a aba aberta. **Ao abrir o painel, o período já vem em *Mês***: do dia 1º do mês do dado mais recente até o último dia com dado (os outros atalhos continuam à mão).
 
 - **Visão geral** — o que importa para decidir, sem um monte de números:
   - **Efetividade** em destaque no topo (das visitas executadas, quantas geraram resultado) e, ao lado, *Percorrido* (= Exec + Exoc), *Exec*, *Exoc* e *Com resultados*;
