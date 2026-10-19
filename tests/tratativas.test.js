@@ -70,7 +70,7 @@ test('categoria do texto livre: a ordem do Power BI, "Outros" e o comércio popu
   });
 });
 
-test('DE/PARA em texto livre: uma categoria é lida, mais de uma vai para a Conferência', () => {
+test('DE/PARA em texto livre: uma categoria é lida; mais de uma vira contagem por categoria', () => {
   const l = T.lerEconomias;
   const casos = [
     ['2 Residências', { n: 2, cat: 'Residencial' }],
@@ -81,34 +81,70 @@ test('DE/PARA em texto livre: uma categoria é lida, mais de uma vai para a Conf
     ['PARA UMA RESIDENCIAL', { n: 1, cat: 'Residencial' }],
     ['2 P. Comercio', { n: 2, cat: 'P. Comércio' }],
     ['5 Salas', { n: 5, cat: 'Outros' }], // sem categoria reconhecida: número do começo
-    ['1 Residencial e 1 Comercial', { composto: true }],
-    ['DE 1 ECONOMIA RESIDENCIAL E 1 ECONOMIA COMERCIAL ', { composto: true }],
-    ['PARA 2 ECONOMIAS RESIDENCIAIS E 1 ECONOMIA COMERCIAL', { composto: true }],
-    ['DE 5 RES. E 1 COM. P/ 4 RES. E 1 COM.', { composto: true }], // a frase inteira nos dois campos
+    ['1 Residencial e 1 Comercial', { composto: true, porCat: { Residencial: 1, Comercial: 1 } }],
+    ['DE 1 ECONOMIA RESIDENCIAL E 1 ECONOMIA COMERCIAL ', { composto: true, porCat: { Residencial: 1, Comercial: 1 } }],
+    ['PARA 2 ECONOMIAS RESIDENCIAIS E 1 ECONOMIA COMERCIAL', { composto: true, porCat: { Residencial: 2, Comercial: 1 } }],
+    ['6RES. E 1 COM.', { composto: true, porCat: { Residencial: 6, Comercial: 1 } }], // sem espaço depois do número
     ['varias', null], ['', null], [null, null], [undefined, null],
   ];
   for (const [txt, esperado] of casos) assert.deepEqual(l(txt), esperado, String(txt));
 });
 
-test('lançamentos reais de Outubro: o "11 ECONOMIAS" entra e os textos com duas categorias são avisados com o Id', () => {
+test('a frase inteira num campo só ("DE ... P/ ..."): vale só com o que ler dos dois lados', () => {
+  const f = T.lerFrase;
+  assert.deepEqual(f('DE 5 RES. E 1 COM. P/ 4 RES. E 1 COM.'), { de: { Residencial: 5, Comercial: 1 }, para: { Residencial: 4, Comercial: 1 } });
+  assert.deepEqual(f('DE 2 RES. P/ 1 RES.'), { de: { Residencial: 2 }, para: { Residencial: 1 } });
+  assert.deepEqual(f('1 Residência PARA 2 Residências'), { de: { Residencial: 1 }, para: { Residencial: 2 } });
+  assert.equal(f('PARA 2 RES.'), null); // o "PARA" do começo é prefixo, não separador
+  assert.equal(f('2 Residências'), null);
+  assert.equal(f(null), null);
+});
+
+test('lançamentos reais de Outubro: o "11 ECONOMIAS" entra e os textos com duas categorias são calculados por categoria', () => {
   const raw = (id, econ, de, para) => ({ id, inicio: '2026-09-10T09:00:00', fim: '2026-09-10T09:02:00', frente: 'Cadastro', econ, de, para });
   const lr = CV.dados.limparResultados([
-    raw(101, 'Decremento', 'DE 11 ECONOMIAS RESIDENCIAIS', '1 Residência'), // −10 economias
+    raw(101, 'Decremento', 'DE 11 ECONOMIAS RESIDENCIAIS', '1 Residência'), // −10 Residencial
     raw(102, 'Incremento', 'DE UMA COMERCIAL', 'PARA UMA RESIDENCIAL'), // 1 → 1: sem variação
-    raw(103, 'Incremento', 'DE 1 ECONOMIA RESIDENCIAL E 1 ECONOMIA COMERCIAL ', 'PARA 1 ECONOMIA RESIDENCIAL E 2 ECONOMIAS COMERCIAIS'),
-    raw(104, 'Decremento', 'DE 5 RES. E 1 COM. P/ 4 RES. E 1 COM.', 'DE 5 RES. E 1 COM. P/ 4 RES. E 1 COM.'),
-    raw(105, 'Incremento', 'varias', '2 Residências'),
+    raw(103, 'Incremento', 'DE 1 ECONOMIA RESIDENCIAL E 1 ECONOMIA COMERCIAL ', 'PARA 1 ECONOMIA RESIDENCIAL E 2 ECONOMIAS COMERCIAIS'), // +1 Comercial
+    raw(104, 'Decremento', 'DE 5 RES. E 1 COM. P/ 4 RES. E 1 COM.', 'DE 5 RES. E 1 COM. P/ 4 RES. E 1 COM.'), // −1 Residencial
+    raw(105, 'Incremento', 'varias', '2 Residências'), // sem número: ilegível
   ]).limpas;
   const a = T.analisar(T.preparar(lr));
-  assert.deepEqual([a.quadros.decEco.n, a.quadros.decEco.valor], [-10, -854.1]); // 10 × 85,41 = 854,10
-  assert.equal(a.quadros.incEco.linhas.length, 0);
-  assert.equal(a.conferencia.ecoIlegivel, 3); // 103, 104 e 105
-  assert.deepEqual(a.exemplos.ecoIlegivel, ['103', '104', '105']);
-  // os três aparecem no Excel, fora dos quadros, com o motivo
-  const fora = T.detalhe(T.preparar(lr)).filter((x) => x.quadro.titulo === '(fora dos quadros)');
-  assert.deepEqual(fora.map((x) => x.l.id), ['103', '104', '105']);
+  assert.deepEqual([a.quadros.decEco.n, a.quadros.decEco.valor], [-11, -939.51]); // 10 × 85,41 + 1 × 85,41
+  assert.deepEqual([a.quadros.incEco.n, a.quadros.incEco.valor], [1, 443.57]);
+  assert.deepEqual(a.quadros.incEco.linhas.map((x) => [x.de, x.para]), [['Comercial', 'Comercial']]);
+  assert.equal(a.conferencia.porCategoria, 2); // 103 e 104
+  assert.equal(a.conferencia.ecoIlegivel, 1); // 105
+  assert.deepEqual(a.exemplos.porCategoria, ['103', '104']);
+  assert.deepEqual(a.exemplos.ecoIlegivel, ['105']);
+  assert.deepEqual(a.exemplos.variacaoGrande, ['101']); // −10 num lançamento só
+  // o ilegível aparece no Excel, fora dos quadros; os calculados por categoria saem com a observação
+  const det = T.detalhe(T.preparar(lr));
+  const fora = det.filter((x) => x.quadro.titulo === '(fora dos quadros)');
+  assert.deepEqual(fora.map((x) => x.l.id), ['105']);
   assert.match(fora[0].obs, /não consegue ler/);
-  assert.equal(CV.exporta.abaTratativas(fora).colunas.find((c) => c.titulo === 'DE:').valor(fora[0]), 'DE 1 ECONOMIA RESIDENCIAL E 1 ECONOMIA COMERCIAL'); // o texto original, sem o espaço que sobrava no fim
+  const d103 = det.find((x) => x.l.id === '103');
+  assert.match(d103.obs, /categoria por categoria/);
+  assert.equal(CV.exporta.abaTratativas(det).colunas.find((c) => c.titulo === 'DE:').valor(d103), 'DE 1 ECONOMIA RESIDENCIAL E 1 ECONOMIA COMERCIAL'); // o texto original, sem o espaço que sobrava no fim
+
+  // compostosPorCategoria: false volta ao "só avisa": 103 e 104 ficam de fora, junto com o 105
+  comRegra({ compostosPorCategoria: false }, () => {
+    const b = T.analisar(T.preparar(lr));
+    assert.deepEqual([b.quadros.decEco.n, b.quadros.decEco.valor], [-10, -854.1]);
+    assert.equal(b.quadros.incEco.linhas.length, 0);
+    assert.equal(b.conferencia.ecoIlegivel, 3);
+    assert.equal(b.conferencia.porCategoria, 0);
+  });
+});
+
+test('variação suspeita: 100 no lugar de 1 é avisado, mas continua valendo; 9 economias não', () => {
+  const raw = (id, de, para) => ({ id, inicio: '2026-04-20T11:00:00', fim: '2026-04-20T11:02:00', frente: 'Cadastro', econ: 'Decremento', de, para });
+  const lr = CV.dados.limparResultados([raw(1, '100 RES.', '1 Residência'), raw(2, '10 Residências', '1 Residência'), raw(3, '5 Residências', '1 Residência')]).limpas;
+  const a = T.analisar(T.preparar(lr));
+  assert.equal(a.quadros.decEco.n, -112); // −99 − 9 − 4
+  assert.equal(a.conferencia.variacaoGrande, 1);
+  assert.deepEqual(a.exemplos.variacaoGrande, ['1']);
+  comRegra({ variacaoSuspeita: 9 }, () => assert.deepEqual(T.analisar(T.preparar(lr)).exemplos.variacaoGrande, ['1', '2'])); // o limite é uma regra
 });
 
 test('número no começo do texto e o que é uma tratativa de verdade', () => {
@@ -186,6 +222,8 @@ test('conferência: o que o Power BI faz de diferente ou que merece olhar', asyn
   const c = T.analisar(T.filtrar(linhas, SET)).conferencia;
   assert.deepEqual(c, {
     ecoIlegivel: 0,
+    porCategoria: 0,
+    variacaoGrande: 0,
     foraFrente: 2, // ids 11 e 22 (Bairro Legal - VCG)
     rotuloIncMenor: 1, // id 6
     rotuloDecMaior: 1, // id 7

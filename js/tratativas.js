@@ -70,8 +70,8 @@
   /**
    * O que um texto de DE: / PARA: diz sobre as economias.
    *   { n, cat }          uma categoria só: "2 Residências", "DE 11 ECONOMIAS RESIDENCIAIS", "UMA COMERCIAL"
-   *   { composto: true }  mais de uma categoria no mesmo texto ("1 RESIDENCIAL E 1 COMERCIAL"): o painel
-   *                       não adivinha o valor, e o lançamento vai para a Conferência
+   *   { composto, porCat } mais de uma categoria no mesmo texto ("1 RESIDENCIAL E 1 COMERCIAL"): porCat é
+   *                       { categoria: quantidade }; o lançamento é calculado por categoria (ver preparar)
    *   null                vazio ou sem número que dê para ler
    * Um texto "N Categoria" dá o mesmo resultado de sempre (número do começo, categoria do texto todo).
    */
@@ -86,10 +86,28 @@
       const cat = categoriaDe(k.slice(m.de, i + 1 < marcas.length ? marcas[i + 1].ini : k.length));
       if (cat !== OUTROS) grupos.push({ n: m.n, cat });
     });
-    if (grupos.length > 1) return { composto: true };
+    if (grupos.length > 1) {
+      const porCat = {};
+      for (const g of grupos) porCat[g.cat] = (porCat[g.cat] || 0) + g.n;
+      return { composto: true, porCat };
+    }
     if (grupos.length === 1) return grupos[0];
     const n = numeroInicial(k); // sem categoria reconhecida ("5 Salas"): número do começo, categoria "Outros"
     return n === null ? null : { n, cat: categoriaDe(k) };
+  }
+
+  /** Contagem por categoria de uma leitura de lerEconomias: { categoria: quantidade }. */
+  const porCategoria = (x) => (x.composto ? x.porCat : { [x.cat]: x.n });
+
+  /**
+   * A frase inteira num campo só: "DE 5 RES. E 1 COM. P/ 4 RES. E 1 COM." (às vezes repetida em DE e em PARA).
+   * Só vale quando há o que ler dos dois lados do "P/" ou do "PARA" (um "PARA 2 RES." do começo não é separador).
+   * Devolve { de, para } por categoria, ou null.
+   */
+  function lerFrase(txt) {
+    const t = N().semAcento(txt === null || txt === undefined ? '' : String(txt)).toUpperCase();
+    const partes = t.split(/P\s*\/|\bPARA\b/).map((p) => lerEconomias(p)).filter(Boolean);
+    return partes.length === 2 ? { de: porCategoria(partes[0]), para: porCategoria(partes[1]) } : null;
   }
 
   /**
@@ -131,6 +149,7 @@
         deTxt: r.de || null,
         paraTxt: r.para || null,
         eco: null,
+        ecoCats: null, // DE/PARA com mais de uma categoria: { de: { categoria: n }, para: { categoria: n } }
         ecoIlegivel: false,
         cat: null,
       };
@@ -138,7 +157,13 @@
       const para = lerEconomias(r.para);
       if (de && para && !de.composto && !para.composto) {
         l.eco = { delta: para.n - de.n, deCat: de.cat, paraCat: para.cat };
-      } else if (r.de || r.para) {
+      } else if (CV.regras.tratativas.compostosPorCategoria !== false) {
+        // mais de uma categoria: a variação é calculada em cada uma (antes → depois)
+        const frase = lerFrase(r.de) || lerFrase(r.para);
+        if (frase) l.ecoCats = frase;
+        else if (de && para) l.ecoCats = { de: porCategoria(de), para: porCategoria(para) };
+      }
+      if (!l.eco && !l.ecoCats && (r.de || r.para)) {
         l.ecoIlegivel = true; // DE/PARA preenchido, mas o painel não consegue ler: fica de fora e vai para a Conferência
       }
       if (r.anterior || r.atual) {
@@ -176,6 +201,15 @@
         out.push({ quadro: 'decEco', frente: l.frente, de: e.deCat, para: e.paraCat, n: e.delta, centavos });
       }
     }
+    if (l.ecoCats) {
+      // cada categoria varia por conta própria: o que passou de PARA sobre DE é incremento, o que faltou é decremento
+      const cats = new Set(Object.keys(l.ecoCats.de).concat(Object.keys(l.ecoCats.para)));
+      for (const cat of cats) {
+        const delta = (l.ecoCats.para[cat] || 0) - (l.ecoCats.de[cat] || 0);
+        if (delta > 0 && l.rotulo !== 'DECREMENTO') out.push({ quadro: 'incEco', frente: l.frente, de: cat, para: cat, n: delta, centavos: delta * centavosDe(cat) });
+        else if (delta < 0) out.push({ quadro: 'decEco', frente: l.frente, de: cat, para: cat, n: delta, centavos: delta * centavosDe(cat) });
+      }
+    }
     const c = l.cat;
     if (c && c.qtd > 0) {
       const centavos = c.qtd * (centavosCategoria(c.atual) - centavosCategoria(c.anterior));
@@ -186,7 +220,9 @@
 
   /** Pontos de atenção de um lançamento (para a Conferência e a coluna "Observação" do Excel). */
   const SINAIS = {
-    ecoIlegivel: 'DE/PARA que o painel não consegue ler (mais de uma categoria no mesmo texto, ou sem número): fica de fora; corrija no formulário',
+    ecoIlegivel: 'DE/PARA que o painel não consegue ler (sem número, ou com mais de uma categoria quando compostosPorCategoria está desligado): fica de fora; corrija no formulário',
+    variacaoGrande: 'Variação grande de economias num único lançamento (limite em regras.js): confira se não é digitação errada, como 100 no lugar de 1',
+    porCategoria: 'DE/PARA com mais de uma categoria no mesmo texto: a variação foi calculada categoria por categoria',
     rotuloIncMenor: 'Marcado como Incremento, mas PARA é menor que DE: entra no decremento',
     rotuloDecMaior: 'Marcado como Decremento, mas PARA é maior que DE: fica de fora',
     mistas: 'DE e PARA de categorias diferentes: valor pela regra do relatório',
@@ -204,6 +240,8 @@
     const e = l.eco;
     const doPowerBI = igualPowerBI();
     if (l.ecoIlegivel) s.push('ecoIlegivel');
+    if (l.ecoCats && evs.length) s.push('porCategoria');
+    if (evs.some((v) => v.quadro.endsWith('Eco') && Math.abs(v.n) >= CV.regras.tratativas.variacaoSuspeita)) s.push('variacaoGrande');
     if (e && e.delta < 0 && l.rotulo === 'INCREMENTO') s.push('rotuloIncMenor');
     if (e && e.delta > 0 && l.rotulo === 'DECREMENTO') s.push('rotuloDecMaior');
     if (evs.some((v) => v.quadro.endsWith('Eco') && v.de !== v.para)) s.push('mistas');
@@ -235,7 +273,7 @@
     const dias = new Set();
 
     for (const l of linhas) {
-      if (!l.dentro) { if (l.eco || l.cat || l.ecoIlegivel) { conf.foraFrente++; anota('foraFrente', l); } continue; }
+      if (!l.dentro) { if (l.eco || l.ecoCats || l.cat || l.ecoIlegivel) { conf.foraFrente++; anota('foraFrente', l); } continue; }
       if (l.tratado) { tratados++; dias.add(l.data); }
       const evs = eventos(l);
       for (const v of evs) {
@@ -339,7 +377,7 @@
   }
 
   CV.tratativas = {
-    QUADROS, SINAIS, OUTROS, rotuloMes, categoriaDe, numeroInicial, lerEconomias, ehTratado,
+    QUADROS, SINAIS, OUTROS, rotuloMes, categoriaDe, numeroInicial, lerEconomias, lerFrase, ehTratado,
     preparar, filtrar, eventos, analisar, porMes, opcoes, detalhe,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = CV.tratativas;
