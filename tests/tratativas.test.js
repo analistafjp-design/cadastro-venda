@@ -291,21 +291,35 @@ test('tela: os quatro quadros com as mesmas colunas do relatório e o total de c
 
   const inc = q('Incremento de economia');
   assert.deepEqual(inc[0], ['Frente de serviço', 'De', 'Para', 'Incremento', 'Valor incremento']);
-  assert.deepEqual(inc[1], ['Total', '', '', '7', 'R$ 1.314,19']); // o total fica no topo, como nas outras tabelas do painel
+  assert.deepEqual(inc[inc.length - 1], ['Total', '', '', '7', 'R$ 1.314,19']); // o total fica embaixo, como no relatório
+  assert.notEqual(inc[1][0], 'Total');
   assert.ok(inc.some((l) => l.join('|') === 'Cadastro|Residencial|Residencial|5|R$ 427,05'));
 
   const dec = q('Decremento de economia');
   assert.deepEqual(dec[0], ['Frente de serviço', 'De', 'Para', 'Decremento', 'Valor decremento']);
-  assert.deepEqual(dec[1], ['Total', '', '', '-5', '-R$ 341,64']);
+  assert.deepEqual(dec[dec.length - 1], ['Total', '', '', '-5', '-R$ 341,64']);
 
   const ic = q('Incremento de categoria');
   assert.deepEqual(ic[0], ['Frente de serviço', 'Anterior', 'Atual', 'Total', 'Valor incremento']);
-  assert.deepEqual(ic[1], ['Total', '', '', '24', 'R$ 2.887,58']);
+  assert.deepEqual(ic[ic.length - 1], ['Total', '', '', '24', 'R$ 2.887,58']);
 
   const dc = q('Decremento de categoria');
   assert.deepEqual(dc[0], ['Frente de serviço', 'Anterior', 'Atual', 'Total', 'Valor decremento']);
-  assert.deepEqual(dc[1], ['Total', '', '', '41', '-R$ 4.017,29']);
+  assert.deepEqual(dc[dc.length - 1], ['Total', '', '', '41', '-R$ 4.017,29']);
   assert.ok(dc.some((l) => l.join('|') === 'Cadastro|Residencial|Social|31|-R$ 1.713,99'));
+});
+
+test('tela: o total é a última linha de cada quadro e fica fixo na base; as outras tabelas mantêm o total no topo', async () => {
+  const alvo = await desenhar();
+  for (const titulo of ['Incremento de economia', 'Decremento de economia', 'Incremento de categoria', 'Decremento de categoria']) {
+    const linhas = secao(alvo, titulo).porTag('tr');
+    assert.match(linhas[linhas.length - 1].className, /\btotal\b.*\bembaixo\b/, titulo);
+    assert.equal(linhas.filter((tr) => /\btotal\b/.test(tr.className)).length, 1, titulo);
+  }
+  // criarTabela sem a opção continua com o total no topo (ex.: Visão geral, Bases)
+  const topo = CV.ui.criarTabela({ colunas: [{ id: 'a', titulo: 'A', tipo: 'txt', valor: (l) => l.a }], linhas: [{ a: 'x' }, { a: 'y' }], total: { a: 'Total' }, ordem: { id: null, dir: 'asc' } });
+  const ls = linhasDaTabela(topo);
+  assert.deepEqual(ls.map((l) => l[0]), ['A', 'Total', 'x', 'y']);
 });
 
 test('tela: cards, saldo em destaque, saldo por mês e conferência', async () => {
@@ -339,6 +353,7 @@ test('tela: sem lançamentos no período os quadros dizem isso e a conferência 
   const alvo = await desenhar({ de: '2027-01-01', ate: '2027-01-31' });
   const inc = textoTabela(secao(alvo, 'Incremento de economia'));
   assert.equal(inc.length, 2); // cabeçalho + a linha "nenhum lançamento"
+  assert.equal(inc.some((l) => l[0] === 'Total'), false); // sem linhas, sem total
   assert.match(inc[1][0], /Nenhum lançamento neste período/);
   assert.equal(secao(alvo, 'Conferência dos dados'), undefined);
   assert.match(alvo.textContent.replace(/ /g, ' '), /Saldo do períodoR\$ 0,00/);

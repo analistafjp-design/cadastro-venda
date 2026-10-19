@@ -1,6 +1,6 @@
 /*
  * ui-tabela.js — tabela ordenável genérica (cabeçalho fixo, 1ª coluna fixa,
- * linha de total fixada no topo, barras de taxa) e os conjuntos de colunas
+ * linha de total fixada no topo (ou na base, com `totalEmbaixo`), barras de taxa) e os conjuntos de colunas
  * usados nas abas.
  */
 (function (global) {
@@ -12,7 +12,7 @@
   /**
    * opcoes: {
    *   colunas: [{ id, titulo, dica, tipo: 'txt'|'num'|'taxa', valor(l), render?(l) -> Node|string, ordena?(l), sem_ordem }],
-   *   linhas, total?: linha, ordem: {id, dir}, aoOrdenar(ordem), classeLinha?(l), maxLinhas?
+   *   linhas, total?: linha, totalEmbaixo?: boolean, ordem: {id, dir}, aoOrdenar(ordem), classeLinha?(l), maxLinhas?
    * }
    */
   function criarTabela(op) {
@@ -89,9 +89,8 @@
         )
       );
       const corpo = h('tbody');
-      if (op.total) {
-        corpo.appendChild(h('tr', { class: 'total' }, cols.map((c) => celula(c, op.total, maxes))));
-      }
+      const linhaTotal = op.total ? h('tr', { class: 'total' + (op.totalEmbaixo ? ' embaixo' : '') }, cols.map((c) => celula(c, op.total, maxes))) : null;
+      if (linhaTotal && !op.totalEmbaixo) corpo.appendChild(linhaTotal);
       const ls = linhasOrdenadas();
       const limite = op.maxLinhas || ls.length;
       for (const l of ls.slice(0, limite)) {
@@ -101,6 +100,7 @@
       if (!ls.length) {
         corpo.appendChild(h('tr', null, h('td', { class: 'txt', colSpan: cols.length, text: op.vazio || 'Nada para mostrar com os filtros atuais.' })));
       }
+      if (linhaTotal && op.totalEmbaixo) corpo.appendChild(linhaTotal);
       tabela.appendChild(corpo);
     }
     desenhar();

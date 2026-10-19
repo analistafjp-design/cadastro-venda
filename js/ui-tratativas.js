@@ -33,7 +33,7 @@
     const b = ui.bloco(q.titulo, DESCRICAO[q.id]);
     const total = { frente: 'Total', ehTotal: true, de: '', para: '', n: dados.n, valor: dados.valor };
     b.appendChild(ui.criarTabela({
-      colunas: colunasQuadro(q), linhas: dados.linhas, total: dados.linhas.length ? total : null,
+      colunas: colunasQuadro(q), linhas: dados.linhas, total: dados.linhas.length ? total : null, totalEmbaixo: true,
       ordem: ordemDe('tratativas-' + q.id, { id: 'frente', dir: 'asc' }), vazio: 'Nenhum lançamento neste período.',
     }));
     return b;
