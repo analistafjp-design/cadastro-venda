@@ -33,7 +33,7 @@
     const b = ui.bloco(q.titulo, DESCRICAO[q.id]);
     const total = { frente: 'Total', ehTotal: true, de: '', para: '', n: dados.n, valor: dados.valor };
     b.appendChild(ui.criarTabela({
-      colunas: colunasQuadro(q), linhas: dados.linhas, total: dados.linhas.length ? total : null,
+      colunas: colunasQuadro(q), linhas: dados.linhas, total: dados.linhas.length ? total : null, totalEmbaixo: true,
       ordem: ordemDe('tratativas-' + q.id, { id: 'frente', dir: 'asc' }), vazio: 'Nenhum lançamento neste período.',
     }));
     return b;
@@ -67,11 +67,13 @@
   }
 
   /** Pontos de atenção do período (só os que existem). */
-  function blocoConferencia(conf) {
+  function blocoConferencia(conf, exemplos) {
     const T = CV.tratativas;
     const itens = [];
-    if (conf.foraFrente > 0) itens.push(fmt.int(conf.foraFrente) + ' lançamento(s) de outra frente de serviço (ex.: Bairro Legal) ficam de fora dos quadros.');
-    for (const [k, texto] of Object.entries(T.SINAIS)) if (conf[k] > 0) itens.push(fmt.int(conf[k]) + ' lançamento(s): ' + texto + '.');
+    // "Id 26630, 26733…": para achar o lançamento no formulário (o Excel exportado traz todos)
+    const ids = (k) => (exemplos && exemplos[k] ? ' [Id ' + exemplos[k].join(', ') + (conf[k] > exemplos[k].length ? '…' : '') + ']' : '');
+    if (conf.foraFrente > 0) itens.push(fmt.int(conf.foraFrente) + ' lançamento(s) de outra frente de serviço (ex.: Bairro Legal) ficam de fora dos quadros' + ids('foraFrente') + '.');
+    for (const [k, texto] of Object.entries(T.SINAIS)) if (conf[k] > 0) itens.push(fmt.int(conf[k]) + ' lançamento(s): ' + texto + ids(k) + '.');
     if (!itens.length) return null;
     const b = ui.bloco('Conferência dos dados', 'Pontos de atenção nos lançamentos do período. A coluna “Observação” do Excel exportado mostra, linha a linha, onde cada um aparece.');
     b.appendChild(h('ul', { class: 'lista-simples' }, itens.map((t) => h('li', { text: t }))));
@@ -107,7 +109,7 @@
 
     alvo.appendChild(h('div', { class: 'grade-quadros' }, T.QUADROS.map((def) => blocoQuadro(def, q[def.id], ctx.ordemDe))));
     alvo.appendChild(blocoMeses(ctx.meses, ctx.ordemDe));
-    const conf = blocoConferencia(a.conferencia);
+    const conf = blocoConferencia(a.conferencia, a.exemplos);
     if (conf) alvo.appendChild(conf);
     alvo.appendChild(h('p', { class: 'nota', text: 'As datas são as da conclusão do formulário. Só entra a frente “' + CV.regras.tratativas.frente + '”. Valor = economias × tarifa da categoria (tarifas em js/regras.js).' }));
   }

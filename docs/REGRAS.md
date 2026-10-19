@@ -232,10 +232,12 @@ Reproduz a página *TRATATIVAS* do relatório do Power BI. Vem **direto da plani
 
 | Quadro | Quais lançamentos | Valor |
 |---|---|---|
-| **Incremento de economia** | `DE:` e `PARA:` com número no começo (`2 Residências`) e PARA > DE, sem estar marcado como *Decremento* e com a categoria de origem reconhecida | (PARA − DE) × tarifa da categoria de PARA |
+| **Incremento de economia** | `DE:` e `PARA:` com uma categoria cada (`2 Residências`; ver *Como o DE/PARA é lido* abaixo) e PARA > DE, sem estar marcado como *Decremento* e com a categoria de origem reconhecida | (PARA − DE) × tarifa da categoria de PARA |
 | **Decremento de economia** | PARA < DE (qualquer rótulo) | (PARA − DE) × tarifa; se DE e PARA são de categorias diferentes, (PARA − DE) × (tarifa DE − tarifa PARA), como no relatório |
 | **Incremento de categoria** | `ANTERIOR` e `ATUAL` com `QUANTIDADE` preenchida e resultado positivo | QUANTIDADE × (tarifa ATUAL − tarifa ANTERIOR) |
 | **Decremento de categoria** | o mesmo, com resultado negativo | idem (valor negativo) |
+
+**Como o DE/PARA é lido.** Cada texto precisa trazer **uma categoria só**, com o número antes dela: `2 Residências`, `11 Residencias`, `DE 11 ECONOMIAS RESIDENCIAIS` (o prefixo `DE`/`PARA` e a palavra `ECONOMIAS` são ignorados), `DE UMA COMERCIAL` (UM/UMA/DOIS/DUAS/TRÊS/QUATRO/CINCO valem como número). Texto com **mais de uma categoria** (`1 RESIDENCIAL E 1 COMERCIAL`, ou a frase inteira `DE 5 RES. E 1 COM. P/ 4 RES. E 1 COM.` nos dois campos) e texto **sem número** o painel não adivinha: o lançamento **fica de fora dos quadros** e aparece na *Conferência* com o `Id` (até 5) e, no Excel, como `(fora dos quadros)` com os textos originais, para corrigir no formulário (por exemplo, reescrevendo `1 RESIDENCIAL E 1 COMERCIAL → 1 RESIDENCIAL` como a categoria que de fato mudou).
 
 Os quadros agrupam por frente de serviço, De/Anterior e Para/Atual, com o total de cada um. **Saldo** = soma dos quatro. Os valores são somados em centavos inteiros (sem erro de ponto flutuante).
 
