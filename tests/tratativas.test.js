@@ -70,6 +70,47 @@ test('categoria do texto livre: a ordem do Power BI, "Outros" e o comércio popu
   });
 });
 
+test('DE/PARA em texto livre: uma categoria é lida, mais de uma vai para a Conferência', () => {
+  const l = T.lerEconomias;
+  const casos = [
+    ['2 Residências', { n: 2, cat: 'Residencial' }],
+    ['11 Residencias', { n: 11, cat: 'Residencial' }],
+    ['DE 11 ECONOMIAS RESIDENCIAIS', { n: 11, cat: 'Residencial' }], // prefixo "DE" e a palavra "ECONOMIAS"
+    ['PARA 2 ECONOMIAS COMERCIAIS', { n: 2, cat: 'Comercial' }],
+    ['DE UMA COMERCIAL', { n: 1, cat: 'Comercial' }], // número por extenso
+    ['PARA UMA RESIDENCIAL', { n: 1, cat: 'Residencial' }],
+    ['2 P. Comercio', { n: 2, cat: 'P. Comércio' }],
+    ['5 Salas', { n: 5, cat: 'Outros' }], // sem categoria reconhecida: número do começo
+    ['1 Residencial e 1 Comercial', { composto: true }],
+    ['DE 1 ECONOMIA RESIDENCIAL E 1 ECONOMIA COMERCIAL ', { composto: true }],
+    ['PARA 2 ECONOMIAS RESIDENCIAIS E 1 ECONOMIA COMERCIAL', { composto: true }],
+    ['DE 5 RES. E 1 COM. P/ 4 RES. E 1 COM.', { composto: true }], // a frase inteira nos dois campos
+    ['varias', null], ['', null], [null, null], [undefined, null],
+  ];
+  for (const [txt, esperado] of casos) assert.deepEqual(l(txt), esperado, String(txt));
+});
+
+test('lançamentos reais de Outubro: o "11 ECONOMIAS" entra e os textos com duas categorias são avisados com o Id', () => {
+  const raw = (id, econ, de, para) => ({ id, inicio: '2026-09-10T09:00:00', fim: '2026-09-10T09:02:00', frente: 'Cadastro', econ, de, para });
+  const lr = CV.dados.limparResultados([
+    raw(101, 'Decremento', 'DE 11 ECONOMIAS RESIDENCIAIS', '1 Residência'), // −10 economias
+    raw(102, 'Incremento', 'DE UMA COMERCIAL', 'PARA UMA RESIDENCIAL'), // 1 → 1: sem variação
+    raw(103, 'Incremento', 'DE 1 ECONOMIA RESIDENCIAL E 1 ECONOMIA COMERCIAL ', 'PARA 1 ECONOMIA RESIDENCIAL E 2 ECONOMIAS COMERCIAIS'),
+    raw(104, 'Decremento', 'DE 5 RES. E 1 COM. P/ 4 RES. E 1 COM.', 'DE 5 RES. E 1 COM. P/ 4 RES. E 1 COM.'),
+    raw(105, 'Incremento', 'varias', '2 Residências'),
+  ]).limpas;
+  const a = T.analisar(T.preparar(lr));
+  assert.deepEqual([a.quadros.decEco.n, a.quadros.decEco.valor], [-10, -854.1]); // 10 × 85,41 = 854,10
+  assert.equal(a.quadros.incEco.linhas.length, 0);
+  assert.equal(a.conferencia.ecoIlegivel, 3); // 103, 104 e 105
+  assert.deepEqual(a.exemplos.ecoIlegivel, ['103', '104', '105']);
+  // os três aparecem no Excel, fora dos quadros, com o motivo
+  const fora = T.detalhe(T.preparar(lr)).filter((x) => x.quadro.titulo === '(fora dos quadros)');
+  assert.deepEqual(fora.map((x) => x.l.id), ['103', '104', '105']);
+  assert.match(fora[0].obs, /não consegue ler/);
+  assert.equal(CV.exporta.abaTratativas(fora).colunas.find((c) => c.titulo === 'DE:').valor(fora[0]), 'DE 1 ECONOMIA RESIDENCIAL E 1 ECONOMIA COMERCIAL'); // o texto original, sem o espaço que sobrava no fim
+});
+
 test('número no começo do texto e o que é uma tratativa de verdade', () => {
   assert.equal(T.numeroInicial('2 Residências'), 2);
   assert.equal(T.numeroInicial('  10 comércios'), 10);
@@ -144,6 +185,7 @@ test('conferência: o que o Power BI faz de diferente ou que merece olhar', asyn
   const { linhas } = await carregar();
   const c = T.analisar(T.filtrar(linhas, SET)).conferencia;
   assert.deepEqual(c, {
+    ecoIlegivel: 0,
     foraFrente: 2, // ids 11 e 22 (Bairro Legal - VCG)
     rotuloIncMenor: 1, // id 6
     rotuloDecMaior: 1, // id 7
@@ -227,7 +269,11 @@ test('a frente de serviço é uma regra: vazia, entram todas', async () => {
 test('detalhe (Excel): um evento por linha, com o quadro, o valor e a observação', async () => {
   const { linhas } = await carregar();
   const det = T.detalhe(T.filtrar(linhas, SET));
-  assert.equal(det.length, 16); // 4 + 4 de economia, 4 + 4 de categoria
+  assert.equal(det.length, 18); // 4 + 4 de economia, 4 + 4 de categoria, e 2 que ficaram de fora (ids 7 e 19) para serem corrigidas
+  const fora = det.filter((x) => x.quadro.titulo === '(fora dos quadros)');
+  assert.deepEqual(fora.map((x) => x.l.id).sort(), ['19', '7']);
+  assert.equal(fora[0].valor, null);
+  assert.match(fora.find((x) => x.l.id === '19').obs, /sem QUANTIDADE/);
   const aba = CV.exporta.abaTratativas(det);
   const val = (x, titulo) => aba.colunas.find((c) => c.titulo === titulo).valor(x);
   const id6 = det.find((x) => x.l.id === '6');
@@ -344,6 +390,7 @@ test('tela: cards, saldo em destaque, saldo por mês e conferência', async () =
   const conf = secao(alvo, 'Conferência dos dados');
   assert.ok(conf);
   assert.match(conf.textContent, /2 lançamento\(s\) de outra frente de serviço/);
+  assert.match(conf.textContent, /\[Id 11, 22\]/); // para achar no formulário
   assert.match(conf.textContent, /Categoria Pública valendo zero, igual ao Power BI/);
   assert.match(conf.textContent, /Comércio popular contado como Comercial/);
   assert.match(conf.textContent, /igualPowerBI: false/);

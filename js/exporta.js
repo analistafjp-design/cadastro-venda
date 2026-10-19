@@ -112,7 +112,6 @@
 
   /** Tratativas: um evento de valor por linha (o lançamento, o quadro em que caiu, as categorias e o R$). */
   function abaTratativas(detalhe) {
-    const eco = (x) => x.quadro.tipo === 'economia';
     return {
       nome: 'Tratativas',
       colunas: [
@@ -126,11 +125,11 @@
         { titulo: 'Para / Atual', valor: (x) => x.v.para },
         { titulo: 'Economias', tipo: 'num', valor: (x) => x.v.n },
         { titulo: 'Valor (R$)', tipo: 'num', valor: (x) => x.valor },
-        { titulo: 'DE:', valor: (x) => (eco(x) ? x.l.eco.deTxt : null) },
-        { titulo: 'PARA:', valor: (x) => (eco(x) ? x.l.eco.paraTxt : null) },
-        { titulo: 'ANTERIOR', valor: (x) => (eco(x) ? null : x.l.cat.anteriorTxt) },
-        { titulo: 'ATUAL', valor: (x) => (eco(x) ? null : x.l.cat.atualTxt) },
-        { titulo: 'QUANTIDADE', tipo: 'num', valor: (x) => (eco(x) ? null : x.l.cat.qtd) },
+        { titulo: 'DE:', valor: (x) => x.l.deTxt },
+        { titulo: 'PARA:', valor: (x) => x.l.paraTxt },
+        { titulo: 'ANTERIOR', valor: (x) => (x.l.cat ? x.l.cat.anteriorTxt : null) },
+        { titulo: 'ATUAL', valor: (x) => (x.l.cat ? x.l.cat.atualTxt : null) },
+        { titulo: 'QUANTIDADE', tipo: 'num', valor: (x) => (x.l.cat && x.l.cat.qtd > 0 ? x.l.cat.qtd : null) },
         { titulo: 'Observação', valor: (x) => x.obs },
       ],
       linhas: detalhe,

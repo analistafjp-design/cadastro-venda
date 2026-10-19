@@ -23,6 +23,7 @@
 
   const OUTROS = 'Outros';
   const PUBLICA = 'Pública';
+  const EXEMPLOS = 5;
 
   /** Os números batem com os do relatório do Power BI (inclusive os dois detalhes de regras.igualPowerBI)? */
   const igualPowerBI = () => CV.regras.tratativas.igualPowerBI !== false;
@@ -64,6 +65,33 @@
     return m ? Number(m[1]) : null;
   }
 
+  const NUMEROS_POR_EXTENSO = { UM: 1, UMA: 1, DOIS: 2, DUAS: 2, TRES: 3, QUATRO: 4, CINCO: 5 };
+
+  /**
+   * O que um texto de DE: / PARA: diz sobre as economias.
+   *   { n, cat }          uma categoria só: "2 Residências", "DE 11 ECONOMIAS RESIDENCIAIS", "UMA COMERCIAL"
+   *   { composto: true }  mais de uma categoria no mesmo texto ("1 RESIDENCIAL E 1 COMERCIAL"): o painel
+   *                       não adivinha o valor, e o lançamento vai para a Conferência
+   *   null                vazio ou sem número que dê para ler
+   * Um texto "N Categoria" dá o mesmo resultado de sempre (número do começo, categoria do texto todo).
+   */
+  function lerEconomias(txt) {
+    const k = N().chave(txt);
+    if (!k) return null;
+    const marcas = [];
+    const rx = /(?:\b(\d+))|(?:\b(UM|UMA|DOIS|DUAS|TRES|QUATRO|CINCO)\b)/g;
+    for (let m = rx.exec(k); m; m = rx.exec(k)) marcas.push({ n: m[1] !== undefined ? Number(m[1]) : NUMEROS_POR_EXTENSO[m[2]], de: m.index + m[0].length, ini: m.index });
+    const grupos = [];
+    marcas.forEach((m, i) => {
+      const cat = categoriaDe(k.slice(m.de, i + 1 < marcas.length ? marcas[i + 1].ini : k.length));
+      if (cat !== OUTROS) grupos.push({ n: m.n, cat });
+    });
+    if (grupos.length > 1) return { composto: true };
+    if (grupos.length === 1) return grupos[0];
+    const n = numeroInicial(k); // sem categoria reconhecida ("5 Salas"): número do começo, categoria "Outros"
+    return n === null ? null : { n, cat: categoriaDe(k) };
+  }
+
   /**
    * O lançamento é uma tratativa de verdade? (TIPO DE ALTERAÇÃO preenchido e que não seja
    * "sem tratativa" nem "encerrado"): é o que o relatório chama de "Total Tratado".
@@ -100,13 +128,18 @@
         rotulo: N().chave(r.econ), // 'INCREMENTO' | 'DECREMENTO' | ''
         tratado: ehTratado(r.tipoAlt),
         popular: /POPULAR/.test(N().chave([r.de, r.para, r.anterior, r.atual].join(' '))),
+        deTxt: r.de || null,
+        paraTxt: r.para || null,
         eco: null,
+        ecoIlegivel: false,
         cat: null,
       };
-      const deN = numeroInicial(r.de);
-      const paraN = numeroInicial(r.para);
-      if (deN !== null && paraN !== null) {
-        l.eco = { deTxt: r.de, paraTxt: r.para, delta: paraN - deN, deCat: categoriaDe(r.de), paraCat: categoriaDe(r.para) };
+      const de = lerEconomias(r.de);
+      const para = lerEconomias(r.para);
+      if (de && para && !de.composto && !para.composto) {
+        l.eco = { delta: para.n - de.n, deCat: de.cat, paraCat: para.cat };
+      } else if (r.de || r.para) {
+        l.ecoIlegivel = true; // DE/PARA preenchido, mas o painel não consegue ler: fica de fora e vai para a Conferência
       }
       if (r.anterior || r.atual) {
         l.cat = { anteriorTxt: r.anterior || null, atualTxt: r.atual || null, anterior: categoriaDe(r.anterior), atual: categoriaDe(r.atual), qtd: typeof r.qtd === 'number' && r.qtd > 0 ? r.qtd : 0 };
@@ -153,6 +186,7 @@
 
   /** Pontos de atenção de um lançamento (para a Conferência e a coluna "Observação" do Excel). */
   const SINAIS = {
+    ecoIlegivel: 'DE/PARA que o painel não consegue ler (mais de uma categoria no mesmo texto, ou sem número): fica de fora; corrija no formulário',
     rotuloIncMenor: 'Marcado como Incremento, mas PARA é menor que DE: entra no decremento',
     rotuloDecMaior: 'Marcado como Decremento, mas PARA é maior que DE: fica de fora',
     mistas: 'DE e PARA de categorias diferentes: valor pela regra do relatório',
@@ -162,10 +196,14 @@
     popular: 'Comércio popular contado como Comercial, igual ao Power BI',
   };
 
+  /** Pontos de atenção que deixam o lançamento de fora dos quadros. */
+  const FORA_DOS_QUADROS = ['ecoIlegivel', 'rotuloDecMaior', 'semQuantidade'];
+
   function sinais(l, evs) {
     const s = [];
     const e = l.eco;
     const doPowerBI = igualPowerBI();
+    if (l.ecoIlegivel) s.push('ecoIlegivel');
     if (e && e.delta < 0 && l.rotulo === 'INCREMENTO') s.push('rotuloIncMenor');
     if (e && e.delta > 0 && l.rotulo === 'DECREMENTO') s.push('rotuloDecMaior');
     if (evs.some((v) => v.quadro.endsWith('Eco') && v.de !== v.para)) s.push('mistas');
@@ -190,12 +228,14 @@
     const quadros = {};
     for (const q of QUADROS) { grupos[q.id] = new Map(); quadros[q.id] = novoQuadro(q); }
     const conf = { foraFrente: 0 };
+    const exemplos = {}; // até 5 Id de cada ponto de atenção, para achar os lançamentos no formulário
+    const anota = (k, l) => { const a = exemplos[k] || (exemplos[k] = []); if (a.length < EXEMPLOS && l.id) a.push(l.id); };
     for (const k of Object.keys(SINAIS)) conf[k] = 0;
     let tratados = 0;
     const dias = new Set();
 
     for (const l of linhas) {
-      if (!l.dentro) { if (l.eco || l.cat) conf.foraFrente++; continue; }
+      if (!l.dentro) { if (l.eco || l.cat || l.ecoIlegivel) { conf.foraFrente++; anota('foraFrente', l); } continue; }
       if (l.tratado) { tratados++; dias.add(l.data); }
       const evs = eventos(l);
       for (const v of evs) {
@@ -207,7 +247,7 @@
         g.centavos += v.centavos;
         g.lancamentos++;
       }
-      for (const s of sinais(l, evs)) conf[s]++;
+      for (const s of sinais(l, evs)) { conf[s]++; anota(s, l); }
     }
 
     let saldoCentavos = 0;
@@ -230,6 +270,7 @@
       saldo: saldoCentavos / 100,
       cartoes: { tratados, dias: dias.size, media: dias.size ? tratados / dias.size : null },
       conferencia: conf,
+      exemplos,
     };
   }
 
@@ -289,12 +330,16 @@
       const evs = eventos(l);
       const obs = sinais(l, evs).map((s) => SINAIS[s]).join('; ');
       for (const v of evs) out.push({ l, v, obs, valor: v.centavos / 100, quadro: QUADROS.find((q) => q.id === v.quadro) });
+      // sem evento mas com motivo para ficar de fora (texto ilegível, rótulo trocado, categoria sem quantidade): aparece para ser corrigido
+      if (!evs.length && l.dentro && sinais(l, evs).some((k) => FORA_DOS_QUADROS.includes(k))) {
+        out.push({ l, v: { de: null, para: null, n: null }, obs, valor: null, quadro: { titulo: '(fora dos quadros)', tipo: l.cat ? 'categoria' : 'economia' } });
+      }
     }
     return out;
   }
 
   CV.tratativas = {
-    QUADROS, SINAIS, OUTROS, rotuloMes, categoriaDe, numeroInicial, ehTratado,
+    QUADROS, SINAIS, OUTROS, rotuloMes, categoriaDe, numeroInicial, lerEconomias, ehTratado,
     preparar, filtrar, eventos, analisar, porMes, opcoes, detalhe,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = CV.tratativas;
