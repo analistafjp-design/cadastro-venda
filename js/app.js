@@ -38,7 +38,7 @@
     totalPercorrido: 0,
     datas: { min: null, max: null },
     opcoes: { cidades: [], equipes: [], bases: [] },
-    filtros: { preset: '30', de: null, ate: null, cidade: null, equipe: null, base: null, semAvulsas: false },
+    filtros: { preset: 'mes', de: null, ate: null, cidade: null, equipe: null, base: null, semAvulsas: false },
     refs: {},
     gran: 'dia',
     granManual: false,
