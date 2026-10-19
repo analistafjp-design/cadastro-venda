@@ -369,28 +369,44 @@ test('formato em reais: duas casas, vírgula e negativo com sinal', () => {
   assert.equal(CV.ui.fmt.dec2(7.5833), '7,58');
 });
 
-test('tela: os quatro quadros com as mesmas colunas do relatório e o total de cada um', async () => {
+test('tela: os quatro quadros, sem a coluna da frente (uma só), com o total de cada um na base', async () => {
   const alvo = await desenhar();
   const q = (titulo) => textoTabela(secao(alvo, titulo));
 
   const inc = q('Incremento de economia');
-  assert.deepEqual(inc[0], ['Frente de serviço', 'De', 'Para', 'Incremento', 'Valor incremento']);
-  assert.deepEqual(inc[inc.length - 1], ['Total', '', '', '7', 'R$ 1.314,19']); // o total fica embaixo, como no relatório
+  assert.deepEqual(inc[0], ['De', 'Para', 'Incremento', 'Valor incremento']);
+  assert.deepEqual(inc[inc.length - 1], ['Total', '', '7', 'R$ 1.314,19']); // o total fica embaixo, como no relatório
   assert.notEqual(inc[1][0], 'Total');
-  assert.ok(inc.some((l) => l.join('|') === 'Cadastro|Residencial|Residencial|5|R$ 427,05'));
+  assert.ok(inc.some((l) => l.join('|') === 'Residencial|Residencial|5|R$ 427,05'));
 
   const dec = q('Decremento de economia');
-  assert.deepEqual(dec[0], ['Frente de serviço', 'De', 'Para', 'Decremento', 'Valor decremento']);
-  assert.deepEqual(dec[dec.length - 1], ['Total', '', '', '-5', '-R$ 341,64']);
+  assert.deepEqual(dec[0], ['De', 'Para', 'Decremento', 'Valor decremento']);
+  assert.deepEqual(dec[dec.length - 1], ['Total', '', '-5', '-R$ 341,64']);
 
   const ic = q('Incremento de categoria');
-  assert.deepEqual(ic[0], ['Frente de serviço', 'Anterior', 'Atual', 'Total', 'Valor incremento']);
-  assert.deepEqual(ic[ic.length - 1], ['Total', '', '', '24', 'R$ 2.887,58']);
+  assert.deepEqual(ic[0], ['Anterior', 'Atual', 'Total', 'Valor incremento']);
+  assert.deepEqual(ic[ic.length - 1], ['Total', '', '24', 'R$ 2.887,58']);
 
   const dc = q('Decremento de categoria');
-  assert.deepEqual(dc[0], ['Frente de serviço', 'Anterior', 'Atual', 'Total', 'Valor decremento']);
-  assert.deepEqual(dc[dc.length - 1], ['Total', '', '', '41', '-R$ 4.017,29']);
-  assert.ok(dc.some((l) => l.join('|') === 'Cadastro|Residencial|Social|31|-R$ 1.713,99'));
+  assert.deepEqual(dc[0], ['Anterior', 'Atual', 'Total', 'Valor decremento']);
+  assert.deepEqual(dc[dc.length - 1], ['Total', '', '41', '-R$ 4.017,29']);
+  assert.ok(dc.some((l) => l.join('|') === 'Residencial|Social|31|-R$ 1.713,99'));
+});
+
+test('tela: se algum dia houver mais de uma frente, a coluna "Frente de serviço" volta (em todos os quadros)', async () => {
+  const { lr } = await carregar();
+  await comRegra({ frente: '' }, async () => {
+    instalar();
+    const alvo = document.createElement('div');
+    CV.ui.renderTratativas(alvo, { analise: T.analisar(T.filtrar(T.preparar(lr.limpas), SET)), meses: [], ordemDe: (id, padrao) => Object.assign({}, padrao) });
+    for (const [titulo, colA] of [['Incremento de economia', 'De'], ['Decremento de economia', 'De'], ['Incremento de categoria', 'Anterior'], ['Decremento de categoria', 'Anterior']]) {
+      const t = textoTabela(secao(alvo, titulo));
+      assert.deepEqual(t[0].slice(0, 2), ['Frente de serviço', colA], titulo);
+    }
+    const dec = textoTabela(secao(alvo, 'Decremento de economia'));
+    assert.ok(dec.some((l) => l[0] === 'Bairro Legal - VCG')); // a frente que antes ficava de fora
+    assert.equal(dec[dec.length - 1][0], 'Total');
+  });
 });
 
 test('tela: o total é a última linha de cada quadro e fica fixo na base; as outras tabelas mantêm o total no topo', async () => {

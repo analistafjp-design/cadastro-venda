@@ -19,22 +19,24 @@
   /** R$ numa célula: vermelho quando negativo. */
   const celulaValor = (v) => h('span', { class: v < 0 ? 'neg' : null, text: fmt.brl(v) });
 
-  function colunasQuadro(q) {
+  /** `comFrente`: a coluna "Frente de serviço" só aparece quando há mais de uma frente nos quadros. */
+  function colunasQuadro(q, comFrente) {
     return [
-      { id: 'frente', titulo: 'Frente de serviço', tipo: 'txt', valor: (l) => l.frente },
+      comFrente ? { id: 'frente', titulo: 'Frente de serviço', tipo: 'txt', valor: (l) => l.frente } : null,
       { id: 'a', titulo: q.colA, tipo: 'txt', valor: (l) => l.de },
       { id: 'b', titulo: q.colB, tipo: 'txt', valor: (l) => l.para },
       { id: 'n', titulo: q.colN, tipo: 'num', valor: (l) => l.n, dica: q.tipo === 'economia' ? 'Economias a mais (+) ou a menos (−)' : 'Economias que mudaram de categoria' },
       { id: 'valor', titulo: q.colValor, tipo: 'num', valor: (l) => l.valor, render: (l) => celulaValor(l.valor), dica: 'R$ por mês: economias × tarifa' },
-    ];
+    ].filter(Boolean);
   }
 
-  function blocoQuadro(q, dados, ordemDe) {
+  function blocoQuadro(q, dados, ordemDe, comFrente) {
     const b = ui.bloco(q.titulo, DESCRICAO[q.id]);
-    const total = { frente: 'Total', ehTotal: true, de: '', para: '', n: dados.n, valor: dados.valor };
+    // o rótulo "Total" fica na primeira coluna que existir
+    const total = { frente: 'Total', ehTotal: true, de: comFrente ? '' : 'Total', para: '', n: dados.n, valor: dados.valor };
     b.appendChild(ui.criarTabela({
-      colunas: colunasQuadro(q), linhas: dados.linhas, total: dados.linhas.length ? total : null, totalEmbaixo: true,
-      ordem: ordemDe('tratativas-' + q.id, { id: 'frente', dir: 'asc' }), vazio: 'Nenhum lançamento neste período.',
+      colunas: colunasQuadro(q, comFrente), linhas: dados.linhas, total: dados.linhas.length ? total : null, totalEmbaixo: true,
+      ordem: ordemDe('tratativas-' + q.id + (comFrente ? '-frente' : ''), { id: comFrente ? 'frente' : 'a', dir: 'asc' }), vazio: 'Nenhum lançamento neste período.',
     }));
     return b;
   }
@@ -107,7 +109,9 @@
       ui.cartao('Decremento de categoria', fmt.brl(q.decCat.valor), 'var(--c-claro)', DESCRICAO.decCat, sub(q.decCat)),
       cartaoSaldo(a.saldo)));
 
-    alvo.appendChild(h('div', { class: 'grade-quadros' }, T.QUADROS.map((def) => blocoQuadro(def, q[def.id], ctx.ordemDe))));
+    // hoje a frente é uma só ("Cadastro"): a coluna só aparece se algum quadro trouxer mais de uma
+    const comFrente = T.QUADROS.some((def) => new Set(q[def.id].linhas.map((l) => l.frente)).size > 1);
+    alvo.appendChild(h('div', { class: 'grade-quadros' }, T.QUADROS.map((def) => blocoQuadro(def, q[def.id], ctx.ordemDe, comFrente))));
     alvo.appendChild(blocoMeses(ctx.meses, ctx.ordemDe));
     const conf = blocoConferencia(a.conferencia, a.exemplos);
     if (conf) alvo.appendChild(conf);
