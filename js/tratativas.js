@@ -1,0 +1,301 @@
+/*
+ * tratativas.js — incremento e decremento de ECONOMIA e de CATEGORIA, em R$, direto da planilha de
+ * Resultados (formulário do backoffice). É a conta do relatório TRATATIVAS do Power BI, em funções
+ * puras (sem DOM), e não depende das atividades nem do cruzamento por matrícula.
+ *
+ *   Economia  (DE: / PARA:)            "2 Residências" -> "5 Residências": +3 economias
+ *     incremento = PARA > DE, e o lançamento não está marcado como "Decremento"
+ *                  valor = (PARA − DE) × tarifa da categoria de PARA
+ *     decremento = PARA < DE (qualquer rótulo)
+ *                  valor = (PARA − DE) × tarifa              (mesma categoria nos dois lados)
+ *                          (PARA − DE) × (tarifa DE − tarifa PARA)   (categorias diferentes, como no Power BI)
+ *   Categoria (ANTERIOR / ATUAL × QUANTIDADE)
+ *     valor = QUANTIDADE × (tarifa ATUAL − tarifa ANTERIOR); positivo = incremento, negativo = decremento
+ *   Saldo = soma dos quatro quadros.
+ *
+ * Só entram lançamentos da frente de serviço de `regras.tratativas.frente` (Cadastro). A data é a da
+ * conclusão do formulário. Os valores são somados em centavos inteiros (sem erro de ponto flutuante).
+ */
+(function (global) {
+  'use strict';
+  const CV = (global.CV = global.CV || {});
+  const N = () => CV.normalize;
+
+  const OUTROS = 'Outros';
+  const PUBLICA = 'Pública';
+
+  /** Os números batem com os do relatório do Power BI (inclusive os dois detalhes de regras.igualPowerBI)? */
+  const igualPowerBI = () => CV.regras.tratativas.igualPowerBI !== false;
+
+  /** Na ordem em que aparecem na tela: economia à esquerda, categoria à direita (2 × 2). */
+  const QUADROS = [
+    { id: 'incEco', titulo: 'Incremento de economia', tipo: 'economia', sinal: 1, colA: 'De', colB: 'Para', colN: 'Incremento', colValor: 'Valor incremento' },
+    { id: 'incCat', titulo: 'Incremento de categoria', tipo: 'categoria', sinal: 1, colA: 'Anterior', colB: 'Atual', colN: 'Total', colValor: 'Valor incremento' },
+    { id: 'decEco', titulo: 'Decremento de economia', tipo: 'economia', sinal: -1, colA: 'De', colB: 'Para', colN: 'Decremento', colValor: 'Valor decremento' },
+    { id: 'decCat', titulo: 'Decremento de categoria', tipo: 'categoria', sinal: -1, colA: 'Anterior', colB: 'Atual', colN: 'Total', colValor: 'Valor decremento' },
+  ];
+
+  const MESES = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
+  /** '2026-10' -> 'OUT/2026' */
+  const rotuloMes = (ym) => MESES[Number(ym.slice(5, 7)) - 1] + '/' + ym.slice(0, 4);
+
+  // ---------------------------------------------------------------- leitura dos textos
+
+  /** Categoria de um texto livre ("2 Comércios", "P. Comercio", "Publica"...); "Outros" se não reconhecer. */
+  function categoriaDe(txt) {
+    const k = N().chave(txt);
+    if (!k) return OUTROS;
+    for (const c of CV.regras.tratativas.categorias) {
+      if (c.soCorrigido && igualPowerBI()) continue;
+      if (c.contem.some((s) => k.indexOf(s) >= 0)) return c.nome;
+    }
+    return OUTROS;
+  }
+
+  const temTarifa = (cat) => typeof CV.regras.tratativas.tarifas[cat] === 'number';
+  /** Tarifa em centavos por economia; sem tarifa (ex.: "Outros") = 0, como o Power BI (valor em branco). */
+  const centavosDe = (cat) => (temTarifa(cat) ? Math.round(CV.regras.tratativas.tarifas[cat] * 100) : 0);
+  /** Nos quadros de categoria o relatório não acha a tarifa da Pública (acento): vale zero. */
+  const centavosCategoria = (cat) => (igualPowerBI() && cat === PUBLICA ? 0 : centavosDe(cat));
+
+  /** "2 Residências" -> 2; sem número no começo -> null. */
+  function numeroInicial(txt) {
+    const m = /^\s*(\d+)/.exec(txt === null || txt === undefined ? '' : String(txt));
+    return m ? Number(m[1]) : null;
+  }
+
+  /**
+   * O lançamento é uma tratativa de verdade? (TIPO DE ALTERAÇÃO preenchido e que não seja
+   * "sem tratativa" nem "encerrado"): é o que o relatório chama de "Total Tratado".
+   */
+  function ehTratado(tipoAlt) {
+    const t = N().texto(tipoAlt);
+    if (t === null || t === ';' || t === '.') return false;
+    const baixo = t.toLowerCase();
+    return baixo.indexOf('sem tratativa') < 0 && baixo.indexOf('encerrado') < 0;
+  }
+
+  // ---------------------------------------------------------------- preparo dos lançamentos
+
+  /**
+   * Resultados limpos (dados.limparResultados) -> lançamentos prontos para somar.
+   * Cada um guarda o que precisa dos textos: o que mudou na economia (eco) e na categoria (cat).
+   */
+  function preparar(resultados) {
+    const regra = CV.regras.tratativas;
+    const frente = regra.frente ? N().chave(regra.frente) : '';
+    const out = [];
+    for (const r of resultados) {
+      if (r.layout === 'vcg') continue; // o formulário do VCG não tem DE/PARA nem categoria antes/depois
+      const data = r.dataFim || r.data;
+      if (!data) continue;
+      const l = {
+        id: r.id,
+        data,
+        mes: data.slice(0, 7),
+        mat: r.mat || r.matBruta || null,
+        assistente: r.assistente || null,
+        frente: r.frente || '',
+        dentro: !frente || N().chave(r.frente).startsWith(frente),
+        rotulo: N().chave(r.econ), // 'INCREMENTO' | 'DECREMENTO' | ''
+        tratado: ehTratado(r.tipoAlt),
+        popular: /POPULAR/.test(N().chave([r.de, r.para, r.anterior, r.atual].join(' '))),
+        eco: null,
+        cat: null,
+      };
+      const deN = numeroInicial(r.de);
+      const paraN = numeroInicial(r.para);
+      if (deN !== null && paraN !== null) {
+        l.eco = { deTxt: r.de, paraTxt: r.para, delta: paraN - deN, deCat: categoriaDe(r.de), paraCat: categoriaDe(r.para) };
+      }
+      if (r.anterior || r.atual) {
+        l.cat = { anteriorTxt: r.anterior || null, atualTxt: r.atual || null, anterior: categoriaDe(r.anterior), atual: categoriaDe(r.atual), qtd: typeof r.qtd === 'number' && r.qtd > 0 ? r.qtd : 0 };
+      }
+      out.push(l);
+    }
+    return out;
+  }
+
+  /** Lançamentos do período e do assistente. Datas ISO; vazio = sem limite. */
+  function filtrar(linhas, f) {
+    const flt = f || {};
+    return linhas.filter((l) => (!flt.de || l.data >= flt.de) && (!flt.ate || l.data <= flt.ate) && (!flt.assistente || l.assistente === flt.assistente));
+  }
+
+  // ---------------------------------------------------------------- eventos de valor
+
+  /**
+   * O que um lançamento acrescenta aos quadros: até um evento de economia e um de categoria.
+   * { quadro, frente, de, para, n (economias), centavos }
+   */
+  function eventos(l) {
+    const out = [];
+    if (!l.dentro) return out;
+    const e = l.eco;
+    if (e) {
+      // incremento: PARA > DE e não marcado como Decremento; o relatório também deixa de fora a categoria de origem "Outros"
+      if (e.delta > 0 && l.rotulo !== 'DECREMENTO' && e.deCat !== OUTROS) {
+        out.push({ quadro: 'incEco', frente: l.frente, de: e.deCat, para: e.paraCat, n: e.delta, centavos: e.delta * centavosDe(e.paraCat) });
+      } else if (e.delta < 0) {
+        const centavos = e.deCat === e.paraCat
+          ? e.delta * centavosDe(e.paraCat)
+          : e.delta * (centavosDe(e.deCat) - centavosDe(e.paraCat));
+        out.push({ quadro: 'decEco', frente: l.frente, de: e.deCat, para: e.paraCat, n: e.delta, centavos });
+      }
+    }
+    const c = l.cat;
+    if (c && c.qtd > 0) {
+      const centavos = c.qtd * (centavosCategoria(c.atual) - centavosCategoria(c.anterior));
+      if (centavos !== 0) out.push({ quadro: centavos > 0 ? 'incCat' : 'decCat', frente: l.frente, de: c.anterior, para: c.atual, n: c.qtd, centavos });
+    }
+    return out;
+  }
+
+  /** Pontos de atenção de um lançamento (para a Conferência e a coluna "Observação" do Excel). */
+  const SINAIS = {
+    rotuloIncMenor: 'Marcado como Incremento, mas PARA é menor que DE: entra no decremento',
+    rotuloDecMaior: 'Marcado como Decremento, mas PARA é maior que DE: fica de fora',
+    mistas: 'DE e PARA de categorias diferentes: valor pela regra do relatório',
+    semTarifa: 'Categoria sem tarifa (“Outros”): valor calculado com tarifa zero',
+    semQuantidade: 'Categoria alterada sem QUANTIDADE: fica de fora (valor zero)',
+    publicaZero: 'Categoria Pública valendo zero, igual ao Power BI (o relatório não acha a tarifa por causa do acento)',
+    popular: 'Comércio popular contado como Comercial, igual ao Power BI',
+  };
+
+  function sinais(l, evs) {
+    const s = [];
+    const e = l.eco;
+    const doPowerBI = igualPowerBI();
+    if (e && e.delta < 0 && l.rotulo === 'INCREMENTO') s.push('rotuloIncMenor');
+    if (e && e.delta > 0 && l.rotulo === 'DECREMENTO') s.push('rotuloDecMaior');
+    if (evs.some((v) => v.quadro.endsWith('Eco') && v.de !== v.para)) s.push('mistas');
+    if (evs.some((v) => !temTarifa(v.de) || !temTarifa(v.para))) s.push('semTarifa');
+    if (l.cat && l.cat.anterior !== l.cat.atual && !(l.cat.qtd > 0)) s.push('semQuantidade');
+    if (doPowerBI && evs.some((v) => v.quadro.endsWith('Cat') && (v.de === PUBLICA || v.para === PUBLICA))) s.push('publicaZero');
+    if (doPowerBI && l.popular && evs.length) s.push('popular');
+    return s;
+  }
+
+  // ---------------------------------------------------------------- quadros
+
+  const novoQuadro = (q) => ({ id: q.id, linhas: [], n: 0, valor: 0, lancamentos: 0 });
+
+  /**
+   * Os quatro quadros, os cards e a conferência de um conjunto de lançamentos (já filtrados).
+   * @returns { quadros: { incEco, incCat, decEco, decCat: { linhas: [{ frente, de, para, n, valor, lancamentos }], n, valor } },
+   *            saldo, cartoes: { tratados, dias, media }, conferencia: { foraFrente, <sinal>: n, ... } }
+   */
+  function analisar(linhas) {
+    const grupos = {};
+    const quadros = {};
+    for (const q of QUADROS) { grupos[q.id] = new Map(); quadros[q.id] = novoQuadro(q); }
+    const conf = { foraFrente: 0 };
+    for (const k of Object.keys(SINAIS)) conf[k] = 0;
+    let tratados = 0;
+    const dias = new Set();
+
+    for (const l of linhas) {
+      if (!l.dentro) { if (l.eco || l.cat) conf.foraFrente++; continue; }
+      if (l.tratado) { tratados++; dias.add(l.data); }
+      const evs = eventos(l);
+      for (const v of evs) {
+        const mapa = grupos[v.quadro];
+        const chave = v.frente + '\u0001' + v.de + '\u0001' + v.para;
+        let g = mapa.get(chave);
+        if (!g) { g = { frente: v.frente, de: v.de, para: v.para, n: 0, centavos: 0, lancamentos: 0 }; mapa.set(chave, g); }
+        g.n += v.n;
+        g.centavos += v.centavos;
+        g.lancamentos++;
+      }
+      for (const s of sinais(l, evs)) conf[s]++;
+    }
+
+    let saldoCentavos = 0;
+    const alfa = (a, b) => a.localeCompare(b, 'pt-BR');
+    for (const q of QUADROS) {
+      const lista = Array.from(grupos[q.id].values()).sort((a, b) => alfa(a.frente, b.frente) || alfa(a.de, b.de) || alfa(a.para, b.para));
+      const alvo = quadros[q.id];
+      let cent = 0;
+      for (const g of lista) {
+        alvo.linhas.push({ frente: g.frente, de: g.de, para: g.para, n: g.n, valor: g.centavos / 100, lancamentos: g.lancamentos });
+        alvo.n += g.n;
+        alvo.lancamentos += g.lancamentos;
+        cent += g.centavos;
+      }
+      alvo.valor = cent / 100;
+      saldoCentavos += cent;
+    }
+    return {
+      quadros,
+      saldo: saldoCentavos / 100,
+      cartoes: { tratados, dias: dias.size, media: dias.size ? tratados / dias.size : null },
+      conferencia: conf,
+    };
+  }
+
+  /**
+   * Saldo de cada mês (todos os meses que têm lançamento da frente), do mais novo ao mais antigo.
+   * `f.assistente` filtra; o período não (a ideia é ver os meses lado a lado).
+   * `variacao` = saldo menos o do mês anterior com lançamento (null no primeiro).
+   */
+  function porMes(linhas, f) {
+    const flt = f || {};
+    const meses = new Map();
+    for (const l of linhas) {
+      if (!l.dentro || (flt.assistente && l.assistente !== flt.assistente)) continue;
+      let m = meses.get(l.mes);
+      if (!m) { m = { mes: l.mes, rotulo: rotuloMes(l.mes), incEco: 0, incCat: 0, decEco: 0, decCat: 0, lancamentos: 0 }; meses.set(l.mes, m); }
+      const evs = eventos(l);
+      if (evs.length) m.lancamentos++;
+      for (const v of evs) m[v.quadro] += v.centavos;
+    }
+    const cron = Array.from(meses.values()).sort((a, b) => (a.mes < b.mes ? -1 : 1));
+    let ant = null;
+    for (const m of cron) {
+      const saldo = m.incEco + m.incCat + m.decEco + m.decCat;
+      for (const k of ['incEco', 'incCat', 'decEco', 'decCat']) m[k] /= 100;
+      m.saldo = saldo / 100;
+      m.variacao = ant === null ? null : (saldo - ant) / 100;
+      ant = saldo;
+    }
+    return cron.reverse();
+  }
+
+  /** Assistentes, meses e primeiro/último dia dos lançamentos da frente (para os filtros da aba). */
+  function opcoes(linhas) {
+    const assistentes = new Set();
+    const meses = new Set();
+    let min = null;
+    let max = null;
+    for (const l of linhas) {
+      if (!l.dentro) continue;
+      if (l.assistente) assistentes.add(l.assistente);
+      meses.add(l.mes);
+      if (!min || l.data < min) min = l.data;
+      if (!max || l.data > max) max = l.data;
+    }
+    return {
+      assistentes: Array.from(assistentes).sort((a, b) => a.localeCompare(b, 'pt-BR')),
+      meses: Array.from(meses).sort().reverse(),
+      min,
+      max,
+    };
+  }
+
+  /** Uma linha por evento de valor (para o Excel): o lançamento, o quadro em que caiu e o valor. */
+  function detalhe(linhas) {
+    const out = [];
+    for (const l of linhas) {
+      const evs = eventos(l);
+      const obs = sinais(l, evs).map((s) => SINAIS[s]).join('; ');
+      for (const v of evs) out.push({ l, v, obs, valor: v.centavos / 100, quadro: QUADROS.find((q) => q.id === v.quadro) });
+    }
+    return out;
+  }
+
+  CV.tratativas = {
+    QUADROS, SINAIS, OUTROS, rotuloMes, categoriaDe, numeroInicial, ehTratado,
+    preparar, filtrar, eventos, analisar, porMes, opcoes, detalhe,
+  };
+  if (typeof module !== 'undefined' && module.exports) module.exports = CV.tratativas;
+})(typeof window !== 'undefined' ? window : globalThis);

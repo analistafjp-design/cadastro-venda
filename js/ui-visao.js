@@ -285,6 +285,9 @@
     alvo.appendChild(blocoT);
   }
 
+  ui.secao = secao;
+  ui.cartao = cartao;
+  ui.bloco = bloco;
   ui.blocoLancamentos = blocoLancamentos;
   ui.renderVisao = renderVisao;
   ui.renderTempos = renderTempos;

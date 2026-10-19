@@ -48,7 +48,7 @@ O botão **Painel VCG** (no topo do Interior) abre a página do VCG, e **Painel 
 
 ## O que o painel mostra
 
-Quatro abas, no estilo do painel de Pós-Corte (cards, tabelas limpas, claro/escuro). Os filtros do topo (data inicial/final, cidade, equipe, base) e os atalhos *Último dia · 7 dias · 30 dias · Mês · Tudo* valem para a aba aberta.
+Cinco abas (a de Tratativas só no Interior), no estilo do painel de Pós-Corte (cards, tabelas limpas, claro/escuro). Os filtros do topo (data inicial/final, cidade, equipe, base) e os atalhos *Último dia · 7 dias · 30 dias · Mês · Tudo* valem para a aba aberta.
 
 - **Visão geral** — o que importa para decidir, sem um monte de números:
   - **Efetividade** em destaque no topo (das visitas executadas, quantas geraram resultado) e, ao lado, *Percorrido* (= Exec + Exoc), *Exec*, *Exoc* e *Com resultados*;
@@ -57,6 +57,7 @@ Quatro abas, no estilo do painel de Pós-Corte (cards, tabelas limpas, claro/esc
   - **Resultado por equipe**: só as equipes que trouxeram resultado no período (resultado maior que zero). O **+** sob o nome abre os serviços que trouxeram resultado e a quantidade;
   - **Por data**: dia, semana ou mês. Datas recentes aparecem como *em maturação* (o backoffice ainda está lançando).
 - **Tempos das equipes** — das equipes que trouxeram resultado no período: **deslocamento**, **serviço**, **pausas e apoio** (refeição, DDS, checklist...) e **ociosidade**, em horas:minutos, com a média por dia trabalhado (ou o total do período) e uma barra de como o dia foi usado, com o percentual escrito em cada trecho.
+- **Tratativas** — o que o backoffice incrementou e decrementou, **em R$** (a página *TRATATIVAS* do relatório do Power BI, agora no painel). Lê só a planilha de Resultados (não precisa das atividades): **Incremento de economia**, **Decremento de economia**, **Incremento de categoria** e **Decremento de categoria** (De/Para ou Anterior/Atual, quantidade e valor, com o total de cada quadro), cards de tratativas (acumulado, dias e média por dia), o **saldo** do período, o **saldo por mês** e a **conferência** dos dados (o que está inconsistente no formulário). Filtros: período, **Mês** e **Assistente**. As tarifas e as regras ficam em `js/regras.js` (`tratativas`) e batem com o relatório ao centavo, salvo as poucas exceções listadas (linhas repetidas, por exemplo) em [`docs/REGRAS.md`](docs/REGRAS.md) § 6.4. Experimente com `exemplos/exemplo-tratativas.xlsx`.
 - **Novos alvos** — listas de ação exportáveis em Excel:
   - *Revisitar*: última visita parou em cliente ausente / retornar depois / imóvel fechado, ordenadas pela **chance estimada** (taxa histórica do projeto × nº de economias);
   - *Corrigir endereço*: "endereço não localizado" (ação do backoffice);
@@ -96,7 +97,7 @@ O app é um site estático, sem build. No GitHub: *Settings → Pages → Deploy
 ## Desenvolvimento
 
 ```bash
-npm test                         # 112 testes (Node 18+; sem dependências)
+npm test                         # 131 testes (Node 18+; sem dependências)
 python3 tests/fixtures/gerar.py  # regenera as planilhas sintéticas (requer openpyxl)
 ```
 
@@ -115,6 +116,7 @@ js/
   escopo.js           equipes e cidades da operação
   paginas.js          as duas páginas (Interior e VCG): equipes, banco e quais arquivos cada uma lê
   tempos.js           deslocamento, serviço, apoio e ociosidade por equipe/dia
+  tratativas.js       incremento/decremento de economia e categoria em R$ (aba Tratativas)
   dados.js            colunas, limpeza e derivação
   cruzamento.js       atribuição retorno → visita (matrícula + janela)
   metricas.js         agregações e listas de novos alvos
@@ -122,7 +124,7 @@ js/
   store.js            armazenamento local (dados e pasta lembrada)
   xlsx-escrita.js     gerador de .xlsx próprio (sem bibliotecas)
   exporta.js          colunas da exportação analítica (formato Atividades)
-  ui-util.js ui-tabela.js ui-visao.js app.js   interface (ui-visao: cards, equipes, tempos)
+  ui-util.js ui-tabela.js ui-visao.js ui-tratativas.js app.js   interface (ui-visao: cards, equipes, tempos; ui-tratativas: aba Tratativas)
 tests/                testes automatizados + planilhas sintéticas
 exemplos/             planilhas sintéticas para experimentar
 ```

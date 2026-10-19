@@ -111,6 +111,69 @@ def linhas_resultados():
     ]
 
 
+def linhas_tratativas():
+    """Formulário de Resultados só com o que a aba Tratativas lê (tests/tratativas.test.js, valores conferidos à mão).
+
+    Tarifas (R$/economia): Residencial 85,41 · Comercial 443,57 · Industrial 613,17 · Pública 129,16 · P. Comércio 221,78 · Social 30,12.
+    Setembro (frente Cadastro; Ana e Bia lançam; datas pela CONCLUSÃO):
+      economia   1-3 incrementos Res→Res (+2,+3) e Com→Com (+1); 4-5 decrementos; 6 rótulo "Incremento" com PARA < DE (vai ao decremento);
+                 7 rótulo "Decremento" com PARA > DE (fica de fora); 8 DE = PARA; 9-10 categorias diferentes em DE e PARA;
+                 11 outra frente; 12 categoria "Outros" na origem (fora do incremento)
+      categoria  13-17 e 20 mudanças com quantidade; 18 para "Outros" (sem tarifa); 19 sem QUANTIDADE; 21 para "Publica" (acento);
+                 20 para "COMÉRCIO POPULAR"; 22 outra frente
+      tratados   linhas com TIPO DE ALTERAÇÃO preenchido (e as sem tratativa, que não contam)
+    Outubro: 29-31 (incremento Res→Res, decremento de categoria e uma tratativa).
+    """
+    def r(id_, dia, colab, mat, econ=None, de=None, para=None, ant=None, atu=None, qtd=None, alt=None, frente="Cadastro", fim=None):
+        ini = D(2026, dia[0], dia[1], 9, 0, 0)
+        return [id_, ini.strftime("%d/%m/%Y %H:%M:%S"), fim or ini + dt.timedelta(minutes=2), "anônima", None, colab, mat, frente,
+                "Alteração de Economia" if (de or para) else "Alteração de Categoria" if (ant or atu) else "Alteração Cadastral Interna",
+                econ, de, para, ant, atu, qtd, None, None, alt]
+
+    A, B = "Ana Souza", "Bia Lima"
+    VCG = "Bairro Legal - VCG"
+    return [
+        # ---- economia
+        r(1, (9, 1), A, 100000001, "Incremento", "1 Residencial", "3 Residências", alt="Telefone -"),
+        r(2, (9, 1), A, 100000002, "Incremento", "1 Comercial", "2 Comércios"),
+        r(3, (9, 2), B, 100000003, "Incremento", "2 Residencial", "5 Residencial"),
+        r(4, (9, 2), B, 100000004, "Decremento", "3 Residências", "1 Residência"),
+        r(5, (9, 3), A, 100000005, "Decremento", "2 Comércios", "1 Comercial"),
+        r(6, (9, 3), A, 100000006, "Incremento", "2 Residencial", "1 Residencial"),
+        r(7, (9, 4), B, 100000007, "Decremento", "1 Residencial", "2 Residencial"),
+        r(8, (9, 4), A, 100000008, "Incremento", "1 Residencial", "1 Comercial"),
+        r(9, (9, 5), A, 100000009, "Incremento", "1 Residencial", "2 Comercial"),
+        r(10, (9, 5), B, 100000010, "Decremento", "3 Residências", "2 Comércios"),
+        r(11, (9, 6), B, 100000011, "Decremento", "2 Residencial", "1 Residencial", frente=VCG),
+        r(12, (9, 6), A, 100000012, "Incremento", "5 Salas", "6 Salas"),
+        # ---- categoria
+        r(13, (9, 1), A, 100000013, ant="Social", atu="Residencial", qtd=14, alt="Alteração de Classificação -"),
+        r(14, (9, 2), B, 100000014, ant="Residencial", atu="Social", qtd=31),
+        r(15, (9, 2), A, 100000015, ant="P. Comercio", atu="Comercial", qtd=7, alt="Rg -"),
+        r(16, (9, 3), B, 100000016, ant="Comercial", atu="P. Comercio", qtd=8),
+        r(17, (9, 3), A, 100000017, ant="Comercial", atu="Industrial", qtd=2),
+        r(18, (9, 4), A, 100000018, ant="Residencial", atu="SEM FINS LUCRATIVOS", qtd=1),
+        r(19, (9, 4), B, 100000019, ant="Social", atu="Comercial"),
+        r(20, (9, 5), A, 100000020, ant="P. Comercio", atu="COMÉRCIO POPULAR", qtd=1),
+        r(21, (9, 5), B, 100000021, ant="Comercial", atu="Publica", qtd=1),
+        r(22, (9, 6), B, 100000022, ant="Social", atu="Residencial", qtd=5, frente=VCG),
+        # ---- só tratativa (para os cards)
+        r(23, (9, 1), A, 100000023, alt="Telefone -"),
+        r(24, (9, 2), B, 100000024, alt="Sem Tratativa"),
+        r(25, (9, 2), B, 100000025),
+        r(26, (9, 3), A, 100000026, alt="Troca de Titularidade - ;NEGOCIAÇÃO DE DÉBITOS"),
+        r(27, (9, 4), B, 100000027, alt=";"),
+        r(28, (9, 7), A, 100000028, alt="Encerrado sem tratativa"),
+        # começou no dia 3 às 23:59 e concluiu no dia 4: vale a data da conclusão
+        [32, "03/09/2026 23:59:00", D(2026, 9, 4, 0, 1, 0), "anônima", None, A, 100000032, "Cadastro", "Alteração Cadastral Interna",
+         None, None, None, None, None, None, None, None, "Telefone -"],
+        # ---- outubro
+        r(29, (10, 1), A, 100000029, "Incremento", "1 Residencial", "2 Residencial"),
+        r(30, (10, 2), B, 100000030, ant="Residencial", atu="Social", qtd=2),
+        r(31, (10, 2), B, 100000031, alt="Telefone -"),
+    ]
+
+
 CAB_RES_VCG = [
     "Id", "Hora de início", "Hora de conclusão", "Email", "Nome", "DATA:", "Matrícula\u00a0", "Bairro", "Equipe",
     "Atualização realizada", "Quantas economias adicionadas", "Categoria adicionada", "Observação",
@@ -218,6 +281,9 @@ if __name__ == "__main__":
     exemplo = [[escopo.get(l[0], l[0])] + l[1:] for l in linhas_atividades() if not str(l[0]).startswith("RIOCORTE")]
     planilha(os.path.join(EXEMPLOS, "exemplo-atividades.xlsx"), "Cadastral", CAB_ATIV, exemplo)
     planilha(os.path.join(EXEMPLOS, "exemplo-resultados.xlsx"), "Planilha1", CAB_RES, linhas_resultados())
+    # aba Tratativas: o formulário de Resultados com incremento/decremento de economia e de categoria
+    planilha(os.path.join(AQUI, "resultados_tratativas.xlsx"), "Table1", CAB_RES, linhas_tratativas())
+    planilha(os.path.join(EXEMPLOS, "exemplo-tratativas.xlsx"), "Table1", CAB_RES, linhas_tratativas())
     # VCG: atividades das equipes do VCG e o formulário "Resultados VCG"
     planilha(os.path.join(AQUI, "resultados_vcg.xlsx"), "Planilha1", CAB_RES_VCG, linhas_resultados_vcg())
     planilha(os.path.join(EXEMPLOS, "exemplo-atividades-vcg.xlsx"), "Cadastral", CAB_ATIV, linhas_atividades_vcg())
