@@ -97,6 +97,18 @@
        * false = corrige os dois: Pública vale 129,16 e Comércio popular tem a tarifa própria (60,24).
        */
       igualPowerBI: true,
+      /**
+       * DE/PARA com mais de uma categoria no mesmo texto ("DE 1 RESIDENCIAL E 1 COMERCIAL" → "PARA 1 RESIDENCIAL
+       * E 2 COMERCIAIS", ou a frase "DE 5 RES. E 1 COM. P/ 4 RES. E 1 COM."): true = a variação é calculada
+       * categoria por categoria (aqui, +1 Comercial) e entra nos quadros; false = o lançamento fica de fora e
+       * aparece na Conferência, para ser corrigido no formulário.
+       */
+      compostosPorCategoria: true,
+      /**
+       * Um único lançamento que acrescenta ou tira este tanto de economias (ou mais) vai para a Conferência:
+       * costuma ser digitação errada ("100 RES." no lugar de "1 RES."). Só avisa; o número continua valendo.
+       */
+      variacaoSuspeita: 10,
     },
 
     /**
