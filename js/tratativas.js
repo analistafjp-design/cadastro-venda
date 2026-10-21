@@ -53,6 +53,22 @@
     return OUTROS;
   }
 
+  /**
+   * Nome da categoria nos quadros de CATEGORIA (campos ANTERIOR e ATUAL): a categoria com tarifa; senão uma de
+   * `outrasCategorias` ("Sem fins lucrativos", "CadÚnico"); senão o próprio texto, como foi escrito. "Outros" só
+   * para campo vazio. É só o nome: a tarifa de quem não está em `tarifas` continua zero.
+   */
+  function nomeCategoria(txt) {
+    const cat = categoriaDe(txt);
+    if (cat !== OUTROS) return cat;
+    const k = N().chave(txt);
+    if (!k) return OUTROS;
+    const conhecida = (CV.regras.tratativas.outrasCategorias || []).find((o) => o.contem.some((s) => k.indexOf(s) >= 0));
+    if (conhecida) return conhecida.nome;
+    const t = String(txt).trim().replace(/\s+/g, ' ');
+    return t === t.toUpperCase() ? t.charAt(0) + t.slice(1).toLowerCase() : t; // "BAIRRO LEGAL" -> "Bairro legal"
+  }
+
   const temTarifa = (cat) => typeof CV.regras.tratativas.tarifas[cat] === 'number';
   /** Tarifa em centavos por economia; sem tarifa (ex.: "Outros") = 0, como o Power BI (valor em branco). */
   const centavosDe = (cat) => (temTarifa(cat) ? Math.round(CV.regras.tratativas.tarifas[cat] * 100) : 0);
@@ -167,7 +183,7 @@
         l.ecoIlegivel = true; // DE/PARA preenchido, mas o painel não consegue ler: fica de fora e vai para a Conferência
       }
       if (r.anterior || r.atual) {
-        l.cat = { anteriorTxt: r.anterior || null, atualTxt: r.atual || null, anterior: categoriaDe(r.anterior), atual: categoriaDe(r.atual), qtd: typeof r.qtd === 'number' && r.qtd > 0 ? r.qtd : 0 };
+        l.cat = { anteriorTxt: r.anterior || null, atualTxt: r.atual || null, anterior: nomeCategoria(r.anterior), atual: nomeCategoria(r.atual), qtd: typeof r.qtd === 'number' && r.qtd > 0 ? r.qtd : 0 };
       }
       out.push(l);
     }
@@ -226,7 +242,7 @@
     rotuloIncMenor: 'Marcado como Incremento, mas PARA é menor que DE: entra no decremento',
     rotuloDecMaior: 'Marcado como Decremento, mas PARA é maior que DE: fica de fora',
     mistas: 'DE e PARA de categorias diferentes: valor pela regra do relatório',
-    semTarifa: 'Categoria sem tarifa (“Outros”): valor calculado com tarifa zero',
+    semTarifa: 'Categoria sem tarifa (ex.: sem fins lucrativos, CadÚnico): valor calculado com tarifa zero',
     semQuantidade: 'Categoria alterada sem QUANTIDADE: fica de fora (valor zero)',
     publicaZero: 'Categoria Pública valendo zero, igual ao Power BI (o relatório não acha a tarifa por causa do acento)',
     popular: 'Comércio popular contado como Comercial, igual ao Power BI',
@@ -377,7 +393,7 @@
   }
 
   CV.tratativas = {
-    QUADROS, SINAIS, OUTROS, rotuloMes, categoriaDe, numeroInicial, lerEconomias, lerFrase, ehTratado,
+    QUADROS, SINAIS, OUTROS, rotuloMes, categoriaDe, nomeCategoria, numeroInicial, lerEconomias, lerFrase, ehTratado,
     preparar, filtrar, eventos, analisar, porMes, opcoes, detalhe,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = CV.tratativas;
