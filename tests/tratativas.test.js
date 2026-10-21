@@ -199,7 +199,7 @@ test('Setembro: incremento e decremento de categoria (quantidade × diferença d
   assert.equal(dec.linhas.length, 4);
   assert.deepEqual([d.get('Residencial>Social').n, d.get('Residencial>Social').valor], [31, -1713.99]);
   assert.deepEqual([d.get('Comercial>P. Comércio').n, d.get('Comercial>P. Comércio').valor], [8, -1774.32]);
-  assert.deepEqual([d.get('Residencial>Outros').n, d.get('Residencial>Outros').valor], [1, -85.41]); // "Outros" não tem tarifa: vale zero
+  assert.deepEqual([d.get('Residencial>Sem fins lucrativos').n, d.get('Residencial>Sem fins lucrativos').valor], [1, -85.41]); // sem tarifa: vale zero (o nome certo, não "Outros")
   assert.deepEqual([d.get('Comercial>Pública').n, d.get('Comercial>Pública').valor], [1, -443.57]); // Pública vale zero nos quadros de categoria (como no relatório)
   assert.deepEqual([dec.n, dec.valor], [41, -4017.29]);
   // a mudança sem QUANTIDADE (id 19) e a de outra frente (id 22) não aparecem
@@ -228,7 +228,7 @@ test('conferência: o que o Power BI faz de diferente ou que merece olhar', asyn
     rotuloIncMenor: 1, // id 6
     rotuloDecMaior: 1, // id 7
     mistas: 2, // ids 9 e 10
-    semTarifa: 1, // id 18 (para "Outros")
+    semTarifa: 1, // id 18 (para "Sem fins lucrativos")
     semQuantidade: 1, // id 19
     publicaZero: 1, // id 21
     popular: 1, // id 20
@@ -497,4 +497,42 @@ test('tela: sem lançamentos no período os quadros dizem isso e a conferência 
   assert.match(inc[1][0], /Nenhum lançamento neste período/);
   assert.equal(secao(alvo, 'Conferência dos dados'), undefined);
   assert.match(alvo.textContent.replace(/ /g, ' '), /Saldo do períodoR\$ 0,00/);
+});
+
+test('quadros de categoria: o nome certo no lugar de "Outros" (sem fins lucrativos, CadÚnico, o texto como foi escrito)', () => {
+  const n = T.nomeCategoria;
+  const casos = [
+    ['SEM FINS LUCRATIVOS', 'Sem fins lucrativos'], ['ENT.S/FIM LUCRATIVO', 'Sem fins lucrativos'], ['ENTIDADE SEM FINS LUCRATIVOS', 'Sem fins lucrativos'],
+    ['CADÚNICO', 'CadÚnico'], ['Cadunico', 'CadÚnico'],
+    ['BAIRRO LEGAL', 'Bairro legal'], ['Bairro Legal', 'Bairro Legal'], // o texto, como foi escrito (só tira o MAIÚSCULO inteiro)
+    ['Residencial', 'Residencial'], ['Social', 'Social'], ['P. Comercio', 'P. Comércio'], ['Publica', 'Pública'], ['COMÉRCIO POPULAR', 'Comercial'],
+    ['', 'Outros'], [null, 'Outros'], [undefined, 'Outros'], // "Outros" só sobra para campo vazio
+  ];
+  for (const [txt, esperado] of casos) assert.equal(n(txt), esperado, String(txt));
+  // o texto livre do DE/PARA continua com "Outros": só os quadros de categoria ganham o nome
+  assert.equal(T.categoriaDe('SEM FINS LUCRATIVOS'), 'Outros');
+});
+
+test('o nome certo não muda nenhum valor: continua sem tarifa (zero), até alguém informar a tarifa', () => {
+  const lanc = (anterior, atual, qtd) => T.preparar(CV.dados.limparResultados([
+    { id: 1, fim: '2026-09-10T10:00:00', inicio: '2026-09-10T09:50:00', frente: 'Cadastro', anterior, atual, qtd },
+  ]).limpas);
+  const linha = (quadro, a) => a.quadros[quadro].linhas[0];
+  // Residencial -> entidade sem fins lucrativos: 1 × (0 − 85,41), decremento
+  let a = T.analisar(lanc('Residencial', 'ENTIDADE SEM FINS LUCRATIVOS', 1));
+  assert.deepEqual([linha('decCat', a).de, linha('decCat', a).para, linha('decCat', a).valor], ['Residencial', 'Sem fins lucrativos', -85.41]);
+  assert.equal(a.conferencia.semTarifa, 1);
+  // CadÚnico -> Social: 7 × (30,12 − 0), incremento
+  a = T.analisar(lanc('CADÚNICO', 'Social', 7));
+  assert.deepEqual([linha('incCat', a).de, linha('incCat', a).para, linha('incCat', a).valor], ['CadÚnico', 'Social', 210.84]);
+  assert.equal(a.conferencia.semTarifa, 1);
+  // com a tarifa informada em regras.js (com este mesmo nome), o valor passa a usá-la
+  comRegra({ tarifas: Object.assign({}, CV.regras.tratativas.tarifas, { 'Sem fins lucrativos': 85.41 }) }, () => {
+    const b = T.analisar(lanc('Residencial', 'SEM FINS LUCRATIVOS', 1));
+    assert.equal(b.quadros.decCat.linhas.length, 0); // mesma tarifa dos dois lados: nada a valorar
+    assert.equal(b.conferencia.semTarifa, 0);
+  });
+  // um texto de categoria qualquer aparece como foi escrito, também sem tarifa
+  a = T.analisar(lanc('Comercial', 'BAIRRO LEGAL', 2));
+  assert.deepEqual([linha('decCat', a).para, linha('decCat', a).valor], ['Bairro legal', -887.14]);
 });

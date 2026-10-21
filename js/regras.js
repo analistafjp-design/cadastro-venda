@@ -90,6 +90,16 @@
         { nome: 'Comercial', contem: ['COM'] },
       ],
       /**
+       * Categorias que o painel conhece só pelo NOME (ANTERIOR/ATUAL dos quadros de categoria) e que não têm
+       * tarifa: valem zero, como no Power BI. Servem para mostrar o nome certo em vez de "Outros"; o valor não
+       * muda. Para valorar uma delas, ponha a tarifa em `tarifas` com este mesmo nome. Um texto que não é de
+       * nenhuma categoria (nem destas) aparece como foi escrito, e "Outros" só sobra para campo vazio.
+       */
+      outrasCategorias: [
+        { nome: 'Sem fins lucrativos', contem: ['LUCRAT'] }, // "SEM FINS LUCRATIVOS", "ENT.S/FIM LUCRATIVO", "ENTIDADE SEM FINS LUCRATIVOS"
+        { nome: 'CadÚnico', contem: ['CADUNICO'] },
+      ],
+      /**
        * true = os números batem com os do relatório do Power BI, inclusive dois detalhes dele que
        * parecem erro: (1) nos quadros de CATEGORIA a "Pública" vale zero (o relatório procura
        * "Publica", sem acento, na tabela de tarifas, que tem "PÚBLICA"); (2) "Comércio popular"
