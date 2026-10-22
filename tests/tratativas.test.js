@@ -450,7 +450,10 @@ test('tela: resumo do período (saldo, incrementos, decrementos), saldo por mês
   assert.deepEqual(meses[1], ['OUT/2026', 'R$ 85,41', 'R$ 0,00', 'R$ 0,00', '-R$ 110,58', '-R$ 25,17', '-R$ 50,34']);
   assert.deepEqual(meses[2], ['SET/2026', 'R$ 1.314,19', 'R$ 2.887,58', '-R$ 341,64', '-R$ 4.017,29', '-R$ 157,16', '-R$ 471,48']);
   assert.equal(alvo.textContent.includes('Vs. mês anterior'), false);
-  assert.match(secao(alvo, 'Saldo por mês').textContent, /Faturado no ano = saldo do mês × os meses que faltam até dezembro \(12 − o mês\)/);
+  assert.doesNotMatch(secao(alvo, 'Saldo por mês').textContent, /Exemplo: saldo de março/); // sem a legenda embaixo da tabela
+  assert.equal(secao(alvo, 'Saldo por mês').porTag('p').filter((p) => /\bnota\b/.test(p.className)).length, 0);
+  const cabecalho = secao(alvo, 'Saldo por mês').porTag('th').find((th) => th.textContent === 'Faturado no ano');
+  assert.match(cabecalho.attrs.title, /Saldo do mês × os meses que faltam até dezembro/); // a explicação fica na dica da coluna
   // conferência
   const conf = secao(alvo, 'Conferência dos dados');
   assert.ok(conf);
@@ -612,4 +615,12 @@ test('Excel do saldo por mês: a última linha é o total', async () => {
   const blob = await CV.xlsxw.gerar([aba]);
   const lido = await CV.xlsx.lerPlanilha(new Uint8Array(await blob.arrayBuffer()), { colunas: { mes: ['Mês'], anual: ['Faturado no ano'] } });
   assert.equal(lido.linhas.length, meses.length + 1);
+});
+
+test('abas: a Tratativas fica em segundo lugar, logo depois da Visão geral', () => {
+  const fonte = require('fs').readFileSync(require('path').join(__dirname, '..', 'js', 'app.js'), 'utf8');
+  const lista = /const ABAS = \[(.*?)\];/.exec(fonte)[1];
+  const ids = Array.from(lista.matchAll(/\['(\w+)',/g)).map((m) => m[1]);
+  assert.deepEqual(ids, ['visao', 'tratativas', 'tempos', 'alvos', 'auditoria']);
+  assert.match(fonte, /if \(id === 'tratativas' && !PAG\.tratativas\) continue;/); // no VCG a aba continua escondida
 });
