@@ -15,11 +15,25 @@
 
   const secao = (texto) => h('div', { class: 'secao', text: texto });
 
-  /** Card no estilo do painel Pós-Corte: bolinha colorida + rótulo, número grande. */
-  function cartao(rotulo, valor, cor, dica, sub) {
+  /** Botão "Excel" de um card: baixa o analítico (uma linha por visita) do serviço. Sem visita, fica desligado. */
+  function botaoBaixar(rotulo, quantidade, aoBaixar) {
+    return h('button', {
+      type: 'button', class: 'baixar', disabled: !quantidade, title: 'Baixar em Excel as visitas de “' + rotulo + '”, uma linha por atividade',
+      attrs: { 'aria-label': 'Baixar em Excel: ' + rotulo },
+      on: { click: aoBaixar },
+    }, ui.s('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true' }, ui.s('path', { d: 'M12 4v12' }), ui.s('path', { d: 'M7 11l5 5 5-5' }), ui.s('path', { d: 'M4 20h16' })), 'Excel');
+  }
+
+  /**
+   * Card no estilo do painel Pós-Corte: bolinha colorida + rótulo, número grande.
+   * `baixar` (opcional): função que baixa o analítico do serviço; põe o botão "Excel" ao lado do número.
+   */
+  function cartao(rotulo, valor, cor, dica, sub, baixar) {
     return h('div', { class: 'cartao', title: dica || null },
       h('div', { class: 'rot' }, h('i', { class: 'dot', style: { background: cor } }), rotulo),
-      h('div', { class: 'valor', text: valor }),
+      baixar
+        ? h('div', { class: 'valor-linha' }, h('div', { class: 'valor', text: fmt.int(valor) }), botaoBaixar(rotulo, valor, baixar))
+        : h('div', { class: 'valor', text: typeof valor === 'number' ? fmt.int(valor) : valor }),
       sub ? h('div', { class: 'sub', text: sub }) : null);
   }
 
@@ -76,11 +90,13 @@
   /**
    * ctx: { vs (visitas já filtradas), equipes (nomes do escopo), gran, aoMudarGran(g),
    *        ordemDe(id, padrao), abertas (Set de equipes abertas), vcg,
-   *        lancamentos (só VCG: metricas.lancamentosPorEquipeTipo), avisoLancamentos }
+   *        lancamentos (só VCG: metricas.lancamentosPorEquipeTipo), avisoLancamentos,
+   *        aoBaixar(id) (botão "Excel" dos cards de incremento, categoria e titularidade; id de metricas.SERVICOS_CARTAO) }
    */
   function renderVisao(alvo, ctx) {
     const R = CV.regras;
     const c = M().cartoes(ctx.vs);
+    const baixarDe = (id) => (ctx.aoBaixar ? () => ctx.aoBaixar(id) : null);
 
     alvo.appendChild(secao('Resultado'));
     alvo.appendChild(h('div', { class: 'cartoes' },
@@ -99,9 +115,10 @@
     const tipos = [
       cartao('Incremento de economia', fmt.int(c.inc), 'var(--c-azul)', 'Só incremento de economia, sem alteração de categoria'),
       cartao('Incremento de economia e alteração de categoria', fmt.int(c.incCat), 'var(--c-roxo)', 'Mesmo retorno com economia e categoria alteradas'),
-      cartao('Total de incremento', fmt.int(c.totalInc), 'var(--c-azul-esc)', 'Incremento de economia + incremento e alteração de categoria'),
-      cartao('Total alteração de categoria', fmt.int(c.totalCat), 'var(--c-verde)', 'Alteração de categoria (inclui a que veio com incremento)'),
-      cartao('Troca de titularidade', fmt.int(c.titular), 'var(--c-laranja)', 'Troca de titular da matrícula'),
+      // os três serviços têm o botão "Excel": o analítico das visitas que entraram na conta do card
+      cartao('Total de incremento', c.totalInc, 'var(--c-azul-esc)', 'Incremento de economia + incremento e alteração de categoria', null, baixarDe('inc')),
+      cartao('Total alteração de categoria', c.totalCat, 'var(--c-verde)', 'Alteração de categoria (inclui a que veio com incremento)', null, baixarDe('cat')),
+      cartao('Troca de titularidade', c.titular, 'var(--c-laranja)', 'Troca de titular da matrícula', null, baixarDe('titular')),
     ];
     if (ctx.vcg) {
       // no VCG a venda e o cliente novo são o que mais importa: cada um tem o seu card

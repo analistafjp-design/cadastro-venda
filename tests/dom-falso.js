@@ -35,7 +35,7 @@ class No {
 }
 
 function instalar() {
-  globalThis.document = { createElement: (t) => new No(t), createTextNode: (t) => new Texto(t) };
+  globalThis.document = { createElement: (t) => new No(t), createElementNS: (ns, t) => new No(t), createTextNode: (t) => new Texto(t) };
 }
 
 /** Linhas de todas as tabelas dentro de `raiz`: [[texto da célula, ...], ...], cabeçalho primeiro. */

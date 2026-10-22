@@ -167,6 +167,23 @@
   /** Visitas executadas com resultado. */
   const comResultado = (visitas) => visitas.filter((v) => v.grupoStatus === 'exec' && v.grupoRetorno === 'resultado');
 
+  /**
+   * Os serviços dos cards de resultado que têm botão de Excel: quais tipos de resultado entram em cada um
+   * (a mesma conta dos cards: o total de incremento inclui o "incremento e alteração de categoria").
+   */
+  const SERVICOS_CARTAO = [
+    { id: 'inc', rotulo: 'Total de incremento', arquivo: 'incremento', tipos: ['inc', 'inc_cat'] },
+    { id: 'cat', rotulo: 'Total alteração de categoria', arquivo: 'alteracao-de-categoria', tipos: ['cat', 'inc_cat'] },
+    { id: 'titular', rotulo: 'Troca de titularidade', arquivo: 'troca-de-titularidade', tipos: ['titular'] },
+  ];
+
+  /** As visitas executadas com resultado de um serviço de card (id de SERVICOS_CARTAO): o que o Excel entrega. */
+  function visitasDoServico(visitas, id) {
+    const s = SERVICOS_CARTAO.find((x) => x.id === id);
+    if (!s) return [];
+    return comResultado(visitas).filter((v) => tiposDoResultado(v).some((t) => s.tipos.indexOf(t) >= 0));
+  }
+
   /** Os números dos cards da visão geral. */
   function cartoes(visitas) {
     const r = resumo(visitas);
@@ -459,7 +476,7 @@
 
   CV.metricas = {
     filtrar, resumo, agruparPor, porPeriodo, textosAvulsas, criarModeloChance,
-    TIPOS_RESULTADO, tiposDoResultado, cartoes, resultadoPorEquipe, conferirLancamentos, lancamentosPorEquipeTipo,
+    TIPOS_RESULTADO, SERVICOS_CARTAO, tiposDoResultado, visitasDoServico, cartoes, resultadoPorEquipe, conferirLancamentos, lancamentosPorEquipeTipo,
     alvosOcorrencia, alvosSemRetorno, alvosEsgotados, territorios,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = CV.metricas;

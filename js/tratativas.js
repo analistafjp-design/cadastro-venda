@@ -36,6 +36,9 @@
     { id: 'decCat', titulo: 'Decremento de categoria', tipo: 'categoria', sinal: -1, colA: 'Anterior', colB: 'Atual', colN: 'Total', colValor: 'Valor decremento' },
   ];
 
+  /** Meses que faltam até dezembro depois do mês ('2026-03' -> 9; dezembro -> 0): o que multiplica o saldo no "faturado no ano". */
+  const mesesAteDezembro = (ym) => 12 - Number(ym.slice(5, 7));
+
   const MESES = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
   /** '2026-10' -> 'OUT/2026' */
   const rotuloMes = (ym) => MESES[Number(ym.slice(5, 7)) - 1] + '/' + ym.slice(0, 4);
@@ -331,7 +334,7 @@
   /**
    * Saldo de cada mês (todos os meses que têm lançamento da frente), do mais novo ao mais antigo.
    * `f.assistente` filtra; o período não (a ideia é ver os meses lado a lado).
-   * `variacao` = saldo menos o do mês anterior com lançamento (null no primeiro).
+   * `anual` = faturado no ano: o saldo do mês vezes os meses que faltam até dezembro (março × 9; dezembro = 0).
    */
   function porMes(linhas, f) {
     const flt = f || {};
@@ -345,13 +348,12 @@
       for (const v of evs) m[v.quadro] += v.centavos;
     }
     const cron = Array.from(meses.values()).sort((a, b) => (a.mes < b.mes ? -1 : 1));
-    let ant = null;
     for (const m of cron) {
-      const saldo = m.incEco + m.incCat + m.decEco + m.decCat;
+      const saldo = m.incEco + m.incCat + m.decEco + m.decCat; // em centavos inteiros
       for (const k of ['incEco', 'incCat', 'decEco', 'decCat']) m[k] /= 100;
       m.saldo = saldo / 100;
-      m.variacao = ant === null ? null : (saldo - ant) / 100;
-      ant = saldo;
+      m.mesesAteDezembro = mesesAteDezembro(m.mes);
+      m.anual = (saldo * m.mesesAteDezembro) / 100;
     }
     return cron.reverse();
   }
@@ -393,7 +395,7 @@
   }
 
   CV.tratativas = {
-    QUADROS, SINAIS, OUTROS, rotuloMes, categoriaDe, nomeCategoria, numeroInicial, lerEconomias, lerFrase, ehTratado,
+    QUADROS, SINAIS, OUTROS, rotuloMes, mesesAteDezembro, categoriaDe, nomeCategoria, numeroInicial, lerEconomias, lerFrase, ehTratado,
     preparar, filtrar, eventos, analisar, porMes, opcoes, detalhe,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = CV.tratativas;

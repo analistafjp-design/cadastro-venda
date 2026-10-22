@@ -96,10 +96,15 @@
         col('decEco', 'Decremento de economia', 'decEco'),
         col('decCat', 'Decremento de categoria', 'decCat'),
         col('saldo', 'Saldo', 'saldo'),
-        { id: 'var', titulo: 'Vs. mês anterior', tipo: 'num', valor: (m) => m.variacao, render: (m) => (m.variacao === null ? '–' : celulaValor(m.variacao)), dica: 'Saldo menos o saldo do mês anterior com lançamento' },
+        {
+          id: 'anual', titulo: 'Faturado no ano', tipo: 'num', valor: (m) => m.anual,
+          render: (m) => h('span', { class: m.anual < 0 ? 'neg' : null, text: fmt.brl(m.anual), title: fmt.brl(m.saldo) + ' × ' + m.mesesAteDezembro + ' (meses até dezembro)' }),
+          dica: 'Saldo do mês × os meses que faltam até dezembro (12 − mês). Em dezembro não falta nenhum: R$ 0,00',
+        },
       ],
       linhas: meses, ordem: ordemDe('tratativas-meses', { id: 'mes', dir: 'desc' }), vazio: 'Nenhum mês com lançamento.',
     }));
+    b.appendChild(h('p', { class: 'nota', text: 'Faturado no ano = saldo do mês × os meses que faltam até dezembro (12 − o mês). Exemplo: saldo de março R$ 1.000,00 × 9 = R$ 9.000,00.' }));
     return b;
   }
 
@@ -113,6 +118,7 @@
     for (const [k, texto] of Object.entries(T.SINAIS)) if (conf[k] > 0) itens.push(fmt.int(conf[k]) + ' lançamento(s): ' + texto + ids(k) + '.');
     if (!itens.length) return null;
     const b = ui.bloco('Conferência dos dados', 'Pontos de atenção nos lançamentos do período. A coluna “Observação” do Excel exportado mostra, linha a linha, onde cada um aparece.');
+    b.className += ' so-tela'; // é para quem confere os dados na tela: não vai para o PDF
     b.appendChild(h('ul', { class: 'lista-simples' }, itens.map((t) => h('li', { text: t }))));
     if (conf.publicaZero > 0 || conf.popular > 0) {
       b.appendChild(h('p', { class: 'nota', text: 'Os números batem com os do relatório do Power BI, inclusive nos dois itens acima sobre Pública e Comércio popular. Para corrigi-los, use igualPowerBI: false em tratativas, no arquivo js/regras.js.' }));
