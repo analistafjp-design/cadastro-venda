@@ -167,6 +167,12 @@ label.check { display: inline-flex; align-items: center; gap: 6px; color: var(--
 .cartao .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--c-cinza); }
 .cartao .valor { font-size: 30px; font-weight: 700; line-height: 1.1; margin-top: 8px; letter-spacing: -.02em; }
 .cartao .sub { margin-top: 4px; font-size: 12px; color: var(--ink-3); }
+.cartao .valor-linha { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; margin-top: 8px; }
+.cartao .valor-linha .valor { margin-top: 0; }
+.cartao .baixar { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink-2); font: inherit; font-size: 12px; cursor: pointer; flex: none; }
+.cartao .baixar svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.cartao .baixar:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.cartao .baixar:disabled { opacity: .4; cursor: default; }
 .cartao.heroi { grid-column: span 2; background: var(--accent-wash); border-color: var(--accent); padding: 16px 20px 18px; }
 .cartao.heroi .rot { font-weight: 600; color: var(--ink); font-size: 14px; }
 .cartao.heroi .dot { width: 10px; height: 10px; }
@@ -316,7 +322,7 @@ code { font-family: var(--mono); font-size: 12px; background: var(--surface-2); 
   .cartao-filtros { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media print {
-  .acoes, .abas, .cartao-filtros, .mensagens, .chips .chip button, .mais { display: none !important; }
+  .acoes, .abas, .cartao-filtros, .mensagens, .chips .chip button, .mais, .baixar, .so-tela { display: none !important; }
   .topo { background: none; border: 0; }
   .marca h1, .marca small { color: #11172a !important; }
   .logo { background: #364dd4; }

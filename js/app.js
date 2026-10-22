@@ -758,7 +758,7 @@
     }
     if (estado.aba === 'visao') {
       CV.ui.renderVisao(alvo, {
-        vs: visitasFiltradas(), equipes: equipesVisiveis(), gran: granularidadeAtual(), ordemDe, abertas: estado.abertas, vcg: PAG.id === 'vcg',
+        vs: visitasFiltradas(), equipes: equipesVisiveis(), gran: granularidadeAtual(), ordemDe, abertas: estado.abertas, vcg: PAG.id === 'vcg', aoBaixar: exportarServico,
         lancamentos: PAG.id === 'vcg' ? lancamentosFiltrados() : null, avisoLancamentos: avisoLancamentos(),
         aoMudarGran: (g) => { estado.gran = g; estado.granManual = true; renderPainel(); },
       });
@@ -845,6 +845,15 @@
   /** Visão geral e Auditoria: as visitas do recorte, uma linha por atividade. */
   function exportarCruzamento() {
     return baixarExcel(PAG.prefixoArquivo + 'visitas_' + periodoTxt(), [CV.exporta.abaVisitas(visitasFiltradas()), CV.exporta.abaFiltros(descricaoFiltros(true))]);
+  }
+
+  /** Botão "Excel" dos cards de incremento, categoria e titularidade: as visitas daquele serviço no recorte da tela. */
+  function exportarServico(id) {
+    const s = M.SERVICOS_CARTAO.find((x) => x.id === id);
+    const linhas = M.visitasDoServico(visitasFiltradas(), id);
+    const filtros = descricaoFiltros(true);
+    filtros.unshift(['Serviço', s.rotulo + (id === 'inc' ? ' (incremento de economia + incremento e alteração de categoria)' : id === 'cat' ? ' (inclui a que veio com incremento)' : '')]);
+    return baixarExcel(PAG.prefixoArquivo + s.arquivo + '_' + periodoTxt(), [CV.exporta.abaVisitas(linhas), CV.exporta.abaFiltros(filtros)]);
   }
 
   /** Tempos: um dia de cada equipe e as atividades com horário. */

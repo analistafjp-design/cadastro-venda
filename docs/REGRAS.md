@@ -222,7 +222,7 @@ A aba mostra a **média por dia trabalhado** ou o **total do período**. Como o 
 
 ## 6.3 Exportação (Excel)
 
-Todo arquivo exportado é `.xlsx`, uma linha por atividade, com as colunas da planilha de Atividades (`Recurso`, `Data`, `ID da Atividade`, `Cód. Protocolo Origem`, `Matrícula`, `Status da Atividade`, `Tipo de Atividade`, `Observação`, `Cidade`, `Bairro`, `Área de Trabalho`, `Endereço`, `Motivo de Não Execução - Normal`, `Categoria`, `Quantidade De Economia`, `Situação Do Imóvel`, `Início`, `Fim`, `Duração`, `Tempo de Deslocamento`) mais: `Projeto (base)`, `Situação da visita`, `Percorrido`, `Retornos do backoffice`, `Grupo do retorno`, `Com resultado`, `Tipo de resultado`, `Desfechos do retorno`, `Δ economias`, `Data do 1º retorno`, `Dias até o retorno` e `Em maturação`. Datas e horários saem como data/hora do Excel, matrícula e ID como número, texto sempre como texto. A aba *Filtros* guarda o período, a equipe, a cidade e a base usados. A aba Tratativas exporta o próprio formato (§ 6.4).
+Todo arquivo exportado é `.xlsx`, uma linha por atividade, com as colunas da planilha de Atividades (`Recurso`, `Data`, `ID da Atividade`, `Cód. Protocolo Origem`, `Matrícula`, `Status da Atividade`, `Tipo de Atividade`, `Observação`, `Cidade`, `Bairro`, `Área de Trabalho`, `Endereço`, `Motivo de Não Execução - Normal`, `Categoria`, `Quantidade De Economia`, `Situação Do Imóvel`, `Início`, `Fim`, `Duração`, `Tempo de Deslocamento`) mais: `Projeto (base)`, `Situação da visita`, `Percorrido`, `Retornos do backoffice`, `Grupo do retorno`, `Com resultado`, `Tipo de resultado`, `Desfechos do retorno`, `Δ economias`, `Data do 1º retorno`, `Dias até o retorno` e `Em maturação`. Datas e horários saem como data/hora do Excel, matrícula e ID como número, texto sempre como texto. A aba *Filtros* guarda o período, a equipe, a cidade e a base usados. A aba Tratativas exporta o próprio formato (§ 6.4). Os cards **Total de incremento**, **Total alteração de categoria** e **Troca de titularidade** da Visão geral têm o botão **Excel**: as visitas executadas com aquele resultado (as mesmas que o card conta; o total de incremento inclui o *incremento e alteração de categoria*, o de categoria inclui a que veio com incremento) neste mesmo formato, e a aba *Filtros* começa com o serviço.
 
 ## 6.4 Aba Tratativas (incremento e decremento, em R$)
 
@@ -247,7 +247,7 @@ Os quadros agrupam por De/Anterior e Para/Atual, com o total de cada um na base 
 
 **Resumo do período** (uma faixa compacta no topo): o **saldo**, os incrementos e os decrementos (R$ e nº de economias) e, no pé, *Acumulado* = lançamentos com tratativa feita (`TIPO DE ALTERAÇÃO` preenchido e diferente de ";", "." e de qualquer texto com "sem tratativa" ou "encerrado": o *Total Tratado* do relatório); *Dias com tratativa* = dias distintos; *Média por dia* = Acumulado ÷ dias.
 
-**Saldo por mês:** todos os meses com lançamento, lado a lado, com a variação sobre o mês anterior. Só o filtro de assistente vale ali (o de período não): substitui a soma feita à mão de cada mês. **Filtros da aba:** datas e atalhos de período, *Mês* (põe as datas no primeiro e no último dia do mês) e *Assistente* (primeiro nome de `Colaborador`). Cidade, equipe e base não se aplicam e não aparecem.
+**Saldo por mês:** todos os meses com lançamento, lado a lado, com o **faturado no ano** = saldo do mês × os meses que faltam até dezembro (12 − o mês): março × 9, outubro × 2, dezembro × 0 (a conta é feita em centavos inteiros). Não há mais o comparativo com o mês anterior. Só o filtro de assistente vale ali (o de período não): substitui a soma feita à mão de cada mês. **Filtros da aba:** datas e atalhos de período, *Mês* (põe as datas no primeiro e no último dia do mês) e *Assistente* (primeiro nome de `Colaborador`). Cidade, equipe e base não se aplicam e não aparecem.
 
 ### Onde o painel difere do relatório (e onde copia o que parece erro)
 
@@ -261,9 +261,9 @@ Conferido contra os dados do próprio relatório (17,6 mil linhas): mês a mês,
 
   Com `igualPowerBI: false` os dois são corrigidos (Pública = 129,16 e Comércio popular = 60,24) e os números deixam de bater com os do relatório.
 
-**Conferência dos dados** (rodapé da aba e coluna *Observação* do Excel): lançamentos de outra frente que ficam de fora; marcados como *Incremento* com PARA < DE (entram no decremento); marcados como *Decremento* com PARA > DE (ficam de fora); DE e PARA de categorias diferentes; categoria sem tarifa; categoria alterada **sem QUANTIDADE** (valor zero); e os dois itens do `igualPowerBI`. Nenhum é corrigido sozinho: o painel só mostra onde estão.
+**Conferência dos dados** (rodapé da aba e coluna *Observação* do Excel; **não sai no PDF**: o bloco leva a classe `so-tela`, escondida pela impressão): lançamentos de outra frente que ficam de fora; marcados como *Incremento* com PARA < DE (entram no decremento); marcados como *Decremento* com PARA > DE (ficam de fora); DE e PARA de categorias diferentes; categoria sem tarifa; categoria alterada **sem QUANTIDADE** (valor zero); e os dois itens do `igualPowerBI`. Nenhum é corrigido sozinho: o painel só mostra onde estão.
 
-**Excel:** abas *Quadros* (grupos, totais e saldo), *Saldo por mês*, *Tratativas* (uma linha por evento de valor: data, Id, matrícula, assistente, quadro, categorias, economias, valor em R$, textos de DE/PARA/ANTERIOR/ATUAL e *Observação*) e *Filtros* (com as tarifas usadas).
+**Excel:** abas *Quadros* (grupos, totais e saldo), *Saldo por mês* (com *Meses até dezembro* e *Faturado no ano*), *Tratativas* (uma linha por evento de valor: data, Id, matrícula, assistente, quadro, categorias, economias, valor em R$, textos de DE/PARA/ANTERIOR/ATUAL e *Observação*) e *Filtros* (com as tarifas usadas).
 
 ## 7. Listas de novos alvos
 

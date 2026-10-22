@@ -256,15 +256,16 @@ test('filtros: assistente e período', async () => {
   assert.deepEqual(nada.cartoes, { tratados: 0, dias: 0, media: null });
 });
 
-test('saldo por mês: do mais novo ao mais antigo, com a variação; o período não filtra, o assistente sim', async () => {
+test('saldo por mês: do mais novo ao mais antigo, com o faturado no ano; o período não filtra, o assistente sim', async () => {
   const { linhas } = await carregar();
   const m = T.porMes(linhas);
   assert.deepEqual(m.map((x) => x.rotulo), ['OUT/2026', 'SET/2026']);
   const [out, set] = m;
   assert.deepEqual([out.incEco, out.incCat, out.decEco, out.decCat, out.saldo], [85.41, 0, 0, -110.58, -25.17]);
-  assert.equal(out.variacao, 131.99); // −25,17 − (−157,16)
+  assert.deepEqual([out.mesesAteDezembro, out.anual], [2, -50.34]); // outubro: −25,17 × 2 (novembro e dezembro)
   assert.equal(set.saldo, -157.16);
-  assert.equal(set.variacao, null); // primeiro mês
+  assert.deepEqual([set.mesesAteDezembro, set.anual], [3, -471.48]); // setembro: −157,16 × 3
+  assert.equal('variacao' in out, false); // o comparativo com o mês anterior saiu
   assert.equal(set.lancamentos, 16);
   const bia = T.porMes(linhas, { assistente: 'Bia' });
   assert.equal(bia[0].saldo, -110.58);
@@ -445,9 +446,11 @@ test('tela: resumo do período (saldo, incrementos, decrementos), saldo por mês
   assert.match(grupos[1].textContent, /5 economia\(s\)/); // o decremento conta economias a menos: 5, sem o sinal
   // saldo por mês: do mais novo ao mais antigo
   const meses = textoTabela(secao(alvo, 'Saldo por mês'));
-  assert.deepEqual(meses[0], ['Mês', 'Incremento de economia', 'Incremento de categoria', 'Decremento de economia', 'Decremento de categoria', 'Saldo', 'Vs. mês anterior']);
-  assert.deepEqual(meses[1], ['OUT/2026', 'R$ 85,41', 'R$ 0,00', 'R$ 0,00', '-R$ 110,58', '-R$ 25,17', 'R$ 131,99']);
-  assert.deepEqual(meses[2], ['SET/2026', 'R$ 1.314,19', 'R$ 2.887,58', '-R$ 341,64', '-R$ 4.017,29', '-R$ 157,16', '–']);
+  assert.deepEqual(meses[0], ['Mês', 'Incremento de economia', 'Incremento de categoria', 'Decremento de economia', 'Decremento de categoria', 'Saldo', 'Faturado no ano']);
+  assert.deepEqual(meses[1], ['OUT/2026', 'R$ 85,41', 'R$ 0,00', 'R$ 0,00', '-R$ 110,58', '-R$ 25,17', '-R$ 50,34']);
+  assert.deepEqual(meses[2], ['SET/2026', 'R$ 1.314,19', 'R$ 2.887,58', '-R$ 341,64', '-R$ 4.017,29', '-R$ 157,16', '-R$ 471,48']);
+  assert.equal(alvo.textContent.includes('Vs. mês anterior'), false);
+  assert.match(secao(alvo, 'Saldo por mês').textContent, /Faturado no ano = saldo do mês × os meses que faltam até dezembro \(12 − o mês\)/);
   // conferência
   const conf = secao(alvo, 'Conferência dos dados');
   assert.ok(conf);
@@ -456,6 +459,7 @@ test('tela: resumo do período (saldo, incrementos, decrementos), saldo por mês
   assert.match(conf.textContent, /Categoria Pública valendo zero, igual ao Power BI/);
   assert.match(conf.textContent, /Comércio popular contado como Comercial/);
   assert.match(conf.textContent, /igualPowerBI: false/);
+  assert.match(conf.className, /\bso-tela\b/); // a conferência é só da tela: o CSS de impressão a esconde do PDF
 });
 
 test('tela: incrementos na coluna da esquerda e decrementos na da direita, economia sobre categoria', async () => {
@@ -535,4 +539,28 @@ test('o nome certo não muda nenhum valor: continua sem tarifa (zero), até algu
   // um texto de categoria qualquer aparece como foi escrito, também sem tarifa
   a = T.analisar(lanc('Comercial', 'BAIRRO LEGAL', 2));
   assert.deepEqual([linha('decCat', a).para, linha('decCat', a).valor], ['Bairro legal', -887.14]);
+});
+
+test('faturado no ano: o saldo do mês × os meses que faltam até dezembro (março × 9, dezembro = 0)', () => {
+  assert.deepEqual(['2026-01', '2026-03', '2026-10', '2026-12'].map(T.mesesAteDezembro), [11, 9, 2, 0]);
+  const lanc = (mes, para) => ({ id: '1', inicio: '2026-' + mes + '-10T09:00:00', fim: '2026-' + mes + '-10T09:05:00', frente: 'Cadastro', econ: 'Incremento', de: '1 Residencial', para });
+  // +11 economias residenciais = 11 × 85,41 = 939,51 por mês
+  const porMes = (mes) => T.porMes(T.preparar(CV.dados.limparResultados([lanc(mes, '12 Residenciais')]).limpas))[0];
+  const mar = porMes('03');
+  assert.deepEqual([mar.saldo, mar.mesesAteDezembro, mar.anual], [939.51, 9, 8455.59]); // 939,51 × 9, sem erro de centavos
+  assert.deepEqual([porMes('12').saldo, porMes('12').anual], [939.51, 0]);
+  assert.equal(porMes('01').anual, 10334.61); // 939,51 × 11
+});
+
+test('Excel do saldo por mês: meses até dezembro e faturado no ano no lugar do comparativo', () => {
+  const aba = CV.exporta.abaMeses([{ rotulo: 'MAR/2026', incEco: 1, incCat: 0, decEco: 0, decCat: 0, saldo: 1, mesesAteDezembro: 9, anual: 9 }]);
+  assert.deepEqual(aba.colunas.map((c) => c.titulo), ['Mês', 'Incremento de economia', 'Incremento de categoria', 'Decremento de economia', 'Decremento de categoria', 'Saldo', 'Meses até dezembro', 'Faturado no ano']);
+  assert.deepEqual(aba.colunas.slice(-2).map((c) => c.valor(aba.linhas[0])), [9, 9]);
+});
+
+test('PDF: a conferência dos dados e os botões de Excel ficam de fora da impressão', () => {
+  const css = require('fs').readFileSync(require('path').join(__dirname, '..', 'css', 'app.css'), 'utf8');
+  const impressao = css.slice(css.indexOf('@media print'));
+  assert.match(impressao, /\.baixar[^{]*\{[^}]*display: none !important/);
+  assert.match(impressao, /\.so-tela[^{]*\{[^}]*display: none !important/);
 });

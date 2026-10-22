@@ -52,12 +52,12 @@ Cinco abas (a de Tratativas só no Interior), no estilo do painel de Pós-Corte 
 
 - **Visão geral** — o que importa para decidir, sem um monte de números:
   - **Efetividade** em destaque no topo (das visitas executadas, quantas geraram resultado) e, ao lado, *Percorrido* (= Exec + Exoc), *Exec*, *Exoc* e *Com resultados*;
-  - **Tipo de resultado**: *Incremento de economia*, *Incremento de economia e alteração de categoria*, *Total de incremento*, *Total alteração de categoria*, *Troca de titularidade* (e *Outros resultados*, se houver: tarifa social, fatura digital, venda, negociação de débitos);
+  - **Tipo de resultado**: *Incremento de economia*, *Incremento de economia e alteração de categoria*, *Total de incremento*, *Total alteração de categoria*, *Troca de titularidade* (e *Outros resultados*, se houver: tarifa social, fatura digital, venda, negociação de débitos). Os cards **Total de incremento**, **Total alteração de categoria** e **Troca de titularidade** têm o botão **Excel**: baixa o analítico das visitas daquele serviço (uma linha por atividade, no formato de Atividades mais o cruzamento, no período e na equipe da tela; a aba *Filtros* diz o recorte);
   - **Bases**: percorrido, com resultados e efetividade de cada base (projeto). A linha **SOLICITADA EM CAMPO** reúne as atividades que não são de nenhuma base (pedidos do atendimento, solicitações das próprias equipes); o filtro *Ocultar “SOLICITADA EM CAMPO”* as tira da análise;
   - **Resultado por equipe**: só as equipes que trouxeram resultado no período (resultado maior que zero). O **+** sob o nome abre os serviços que trouxeram resultado e a quantidade;
   - **Por data**: dia, semana ou mês. Datas recentes aparecem como *em maturação* (o backoffice ainda está lançando).
 - **Tempos das equipes** — das equipes que trouxeram resultado no período: **deslocamento**, **serviço**, **pausas e apoio** (refeição, DDS, checklist...) e **ociosidade**, em horas:minutos, com a média por dia trabalhado (ou o total do período) e uma barra de como o dia foi usado, com o percentual escrito em cada trecho.
-- **Tratativas** — o que o backoffice incrementou e decrementou, **em R$** (a página *TRATATIVAS* do relatório do Power BI, agora no painel). Lê só a planilha de Resultados (não precisa das atividades): **Incremento de economia**, **Decremento de economia**, **Incremento de categoria** e **Decremento de categoria** (De/Para ou Anterior/Atual, quantidade e valor com uma barra proporcional, e o total de cada quadro na base; incrementos à esquerda, decrementos à direita), uma faixa de resumo com o **saldo** do período, os incrementos e decrementos e os números de tratativas (acumulado, dias e média por dia), o **saldo por mês** e a **conferência** dos dados (o que está inconsistente no formulário). Filtros: período, **Mês** e **Assistente**. As tarifas e as regras ficam em `js/regras.js` (`tratativas`) e batem com o relatório ao centavo, salvo as poucas exceções listadas (linhas repetidas, por exemplo) em [`docs/REGRAS.md`](docs/REGRAS.md) § 6.4. Experimente com `exemplos/exemplo-tratativas.xlsx`.
+- **Tratativas** — o que o backoffice incrementou e decrementou, **em R$** (a página *TRATATIVAS* do relatório do Power BI, agora no painel). Lê só a planilha de Resultados (não precisa das atividades): **Incremento de economia**, **Decremento de economia**, **Incremento de categoria** e **Decremento de categoria** (De/Para ou Anterior/Atual, quantidade e valor com uma barra proporcional, e o total de cada quadro na base; incrementos à esquerda, decrementos à direita), uma faixa de resumo com o **saldo** do período, os incrementos e decrementos e os números de tratativas (acumulado, dias e média por dia), o **saldo por mês** (com o **faturado no ano**: o saldo do mês × os meses que faltam até dezembro) e a **conferência** dos dados (o que está inconsistente no formulário; fica só na tela, não vai para o PDF). Filtros: período, **Mês** e **Assistente**. As tarifas e as regras ficam em `js/regras.js` (`tratativas`) e batem com o relatório ao centavo, salvo as poucas exceções listadas (linhas repetidas, por exemplo) em [`docs/REGRAS.md`](docs/REGRAS.md) § 6.4. Experimente com `exemplos/exemplo-tratativas.xlsx`.
 - **Novos alvos** — listas de ação exportáveis em Excel:
   - *Revisitar*: última visita parou em cliente ausente / retornar depois / imóvel fechado, ordenadas pela **chance estimada** (taxa histórica do projeto × nº de economias);
   - *Corrigir endereço*: "endereço não localizado" (ação do backoffice);
@@ -72,7 +72,7 @@ Cinco abas (a de Tratativas só no Interior), no estilo do painel de Pós-Corte 
 - *Tempos das equipes*: aba *Dia da equipe* (início, fim, deslocamento, serviço, pausas e apoio e ociosidade de cada equipe em cada dia) e aba *Atividades* (as atividades com horário e como entram na conta).
 - *Novos alvos*: a última atividade de cada alvo da lista aberta, com tentativas, chance estimada, dias sem retorno etc.; *Onde atuar* leva as atividades dos grupos listados com a taxa, o índice e a leitura do grupo.
 
-O **Exportar PDF** usa a impressão do navegador.
+O **Exportar PDF** usa a impressão do navegador (os botões e a *Conferência dos dados* da aba Tratativas não saem no PDF).
 
 > **Tempos: use a exportação completa.** Refeição, DDS, carregamento de material e as demais atividades de apoio só vêm na exportação completa do sistema (não na planilha "Cadastrais"). Num dia só com visitas o almoço viraria ociosidade; por isso a aba mostra por padrão só os **dias completos** (os que têm essas atividades) e deixa a opção *Todos os dias*.
 
@@ -97,7 +97,7 @@ O app é um site estático, sem build. No GitHub: *Settings → Pages → Deploy
 ## Desenvolvimento
 
 ```bash
-npm test                         # 141 testes (Node 18+; sem dependências)
+npm test                         # 147 testes (Node 18+; sem dependências)
 python3 tests/fixtures/gerar.py  # regenera as planilhas sintéticas (requer openpyxl)
 ```
 

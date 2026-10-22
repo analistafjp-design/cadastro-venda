@@ -159,7 +159,7 @@
     };
   }
 
-  /** Tratativas: o saldo de cada mês. */
+  /** Tratativas: o saldo de cada mês e o faturado no ano (saldo × meses até dezembro). */
   function abaMeses(meses) {
     return {
       nome: 'Saldo por mês',
@@ -170,7 +170,8 @@
         { titulo: 'Decremento de economia', tipo: 'num', valor: (m) => m.decEco },
         { titulo: 'Decremento de categoria', tipo: 'num', valor: (m) => m.decCat },
         { titulo: 'Saldo', tipo: 'num', valor: (m) => m.saldo },
-        { titulo: 'Vs. mês anterior', tipo: 'num', valor: (m) => m.variacao },
+        { titulo: 'Meses até dezembro', tipo: 'num', valor: (m) => m.mesesAteDezembro },
+        { titulo: 'Faturado no ano', tipo: 'num', valor: (m) => m.anual },
       ],
       linhas: meses,
     };
