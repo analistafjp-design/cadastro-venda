@@ -358,6 +358,22 @@
     return cron.reverse();
   }
 
+  /**
+   * A linha "Total" do saldo por mês: a soma de cada coluna de `porMes`, em centavos inteiros (sem erro de
+   * ponto flutuante). O faturado no ano somado é o que todos os meses juntos faturam até dezembro.
+   */
+  function totalDosMeses(meses) {
+    const campos = ['incEco', 'incCat', 'decEco', 'decCat', 'saldo', 'anual'];
+    const t = { mes: '', rotulo: 'Total', mesesAteDezembro: null, lancamentos: 0 };
+    for (const k of campos) t[k] = 0;
+    for (const m of meses) {
+      t.lancamentos += m.lancamentos;
+      for (const k of campos) t[k] += Math.round(m[k] * 100);
+    }
+    for (const k of campos) t[k] /= 100;
+    return t;
+  }
+
   /** Assistentes, meses e primeiro/último dia dos lançamentos da frente (para os filtros da aba). */
   function opcoes(linhas) {
     const assistentes = new Set();
@@ -396,7 +412,7 @@
 
   CV.tratativas = {
     QUADROS, SINAIS, OUTROS, rotuloMes, mesesAteDezembro, categoriaDe, nomeCategoria, numeroInicial, lerEconomias, lerFrase, ehTratado,
-    preparar, filtrar, eventos, analisar, porMes, opcoes, detalhe,
+    preparar, filtrar, eventos, analisar, porMes, totalDosMeses, opcoes, detalhe,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = CV.tratativas;
 })(typeof window !== 'undefined' ? window : globalThis);

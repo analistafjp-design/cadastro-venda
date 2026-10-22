@@ -159,7 +159,7 @@
     };
   }
 
-  /** Tratativas: o saldo de cada mês e o faturado no ano (saldo × meses até dezembro). */
+  /** Tratativas: o saldo de cada mês e o faturado no ano (saldo × meses até dezembro), com o total na última linha. */
   function abaMeses(meses) {
     return {
       nome: 'Saldo por mês',
@@ -173,7 +173,7 @@
         { titulo: 'Meses até dezembro', tipo: 'num', valor: (m) => m.mesesAteDezembro },
         { titulo: 'Faturado no ano', tipo: 'num', valor: (m) => m.anual },
       ],
-      linhas: meses,
+      linhas: meses.length ? meses.concat([CV.tratativas.totalDosMeses(meses)]) : meses, // a última linha é o total
     };
   }
 
