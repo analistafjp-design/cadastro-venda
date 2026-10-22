@@ -86,7 +86,7 @@
 
   function blocoMeses(meses, ordemDe) {
     const b = ui.bloco('Saldo por mês',
-      'Todos os meses com lançamento, lado a lado (só o filtro de assistente vale aqui; o de período não). Substitui a conta feita à mão de cada mês.');
+      'Todos os meses com lançamento, lado a lado, e o total de cada coluna (só o filtro de assistente vale aqui; o de período não). Substitui a conta feita à mão de cada mês.');
     const col = (id, titulo, k) => ({ id, titulo, tipo: 'num', valor: (m) => m[k], render: (m) => celulaValor(m[k]) });
     b.appendChild(ui.criarTabela({
       colunas: [
@@ -98,11 +98,16 @@
         col('saldo', 'Saldo', 'saldo'),
         {
           id: 'anual', titulo: 'Faturado no ano', tipo: 'num', valor: (m) => m.anual,
-          render: (m) => h('span', { class: m.anual < 0 ? 'neg' : null, text: fmt.brl(m.anual), title: fmt.brl(m.saldo) + ' × ' + m.mesesAteDezembro + ' (meses até dezembro)' }),
+          render: (m) => h('span', {
+            class: m.anual < 0 ? 'neg' : null, text: fmt.brl(m.anual),
+            title: m.ehTotal ? 'Soma do faturado no ano de todos os meses' : fmt.brl(m.saldo) + ' × ' + m.mesesAteDezembro + ' (meses até dezembro)',
+          }),
           dica: 'Saldo do mês × os meses que faltam até dezembro (12 − mês). Em dezembro não falta nenhum: R$ 0,00',
         },
       ],
-      linhas: meses, ordem: ordemDe('tratativas-meses', { id: 'mes', dir: 'desc' }), vazio: 'Nenhum mês com lançamento.',
+      // o total soma cada coluna (em R$) e fica na base, como nos quadros
+      linhas: meses, total: meses.length ? Object.assign(CV.tratativas.totalDosMeses(meses), { ehTotal: true }) : null, totalEmbaixo: true,
+      ordem: ordemDe('tratativas-meses', { id: 'mes', dir: 'desc' }), vazio: 'Nenhum mês com lançamento.',
     }));
     b.appendChild(h('p', { class: 'nota', text: 'Faturado no ano = saldo do mês × os meses que faltam até dezembro (12 − o mês). Exemplo: saldo de março R$ 1.000,00 × 9 = R$ 9.000,00.' }));
     return b;

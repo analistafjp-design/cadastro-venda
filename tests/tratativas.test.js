@@ -564,3 +564,52 @@ test('PDF: a conferência dos dados e os botões de Excel ficam de fora da impre
   assert.match(impressao, /\.baixar[^{]*\{[^}]*display: none !important/);
   assert.match(impressao, /\.so-tela[^{]*\{[^}]*display: none !important/);
 });
+
+test('total do saldo por mês: soma cada coluna em centavos (sem erro de ponto flutuante) e fecha com o saldo', async () => {
+  const { linhas } = await carregar();
+  const meses = T.porMes(linhas);
+  const t = T.totalDosMeses(meses);
+  assert.deepEqual([t.incEco, t.incCat, t.decEco, t.decCat], [1399.6, 2887.58, -341.64, -4127.87]); // 85,41 + 1.314,19 etc.
+  assert.equal(t.saldo, -182.33); // −25,17 + (−157,16)
+  assert.equal(t.anual, -521.82); // −50,34 + (−471,48)
+  assert.equal(Math.round((t.incEco + t.incCat + t.decEco + t.decCat) * 100), Math.round(t.saldo * 100)); // as quatro colunas fecham com o saldo
+  assert.equal(t.lancamentos, meses.reduce((s, m) => s + m.lancamentos, 0));
+  assert.equal(t.rotulo, 'Total');
+  // 0,1 + 0,2 não vira 0,30000000000000004
+  assert.equal(T.totalDosMeses([{ lancamentos: 1, incEco: 0.1, incCat: 0, decEco: 0, decCat: 0, saldo: 0.1, anual: 0.1 }, { lancamentos: 1, incEco: 0.2, incCat: 0, decEco: 0, decCat: 0, saldo: 0.2, anual: 0.2 }]).saldo, 0.3);
+  const vazio = T.totalDosMeses([]);
+  assert.deepEqual([vazio.saldo, vazio.anual, vazio.lancamentos], [0, 0, 0]);
+});
+
+test('tela: o saldo por mês termina numa linha Total com a soma de cada coluna, inclusive o faturado no ano', async () => {
+  const alvo = await desenhar();
+  const bloco = secao(alvo, 'Saldo por mês');
+  const meses = textoTabela(bloco);
+  assert.equal(meses.length, 4); // cabeçalho, OUT, SET e o total (na base)
+  assert.deepEqual(meses[3], ['Total', 'R$ 1.399,60', 'R$ 2.887,58', '-R$ 341,64', '-R$ 4.127,87', '-R$ 182,33', '-R$ 521,82']);
+  const linhasTr = bloco.porTag('tr');
+  assert.match(linhasTr[linhasTr.length - 1].className, /\btotal\b/);
+  assert.match(linhasTr[linhasTr.length - 1].className, /\bembaixo\b/);
+  // o total do faturado no ano diz o que é
+  assert.ok(linhasTr[linhasTr.length - 1].achar((n) => n.attrs.title === 'Soma do faturado no ano de todos os meses').length === 1);
+  // sem nenhum mês com lançamento não há total
+  const alvoVazio = document.createElement('div');
+  CV.ui.renderTratativas(alvoVazio, { analise: T.analisar([]), meses: [], ordemDe: (id, p) => Object.assign({}, p) });
+  const vazio = textoTabela(secao(alvoVazio, 'Saldo por mês'));
+  assert.equal(vazio.some((l) => l[0] === 'Total'), false);
+});
+
+test('Excel do saldo por mês: a última linha é o total', async () => {
+  const { linhas } = await carregar();
+  const meses = T.porMes(linhas);
+  const aba = CV.exporta.abaMeses(meses);
+  assert.equal(aba.linhas.length, meses.length + 1);
+  const total = aba.linhas[aba.linhas.length - 1];
+  const val = (titulo) => aba.colunas.find((c) => c.titulo === titulo).valor(total);
+  assert.deepEqual([val('Mês'), val('Saldo'), val('Faturado no ano'), val('Meses até dezembro')], ['Total', -182.33, -521.82, null]);
+  assert.equal(CV.exporta.abaMeses([]).linhas.length, 0);
+  // vira arquivo e volta
+  const blob = await CV.xlsxw.gerar([aba]);
+  const lido = await CV.xlsx.lerPlanilha(new Uint8Array(await blob.arrayBuffer()), { colunas: { mes: ['Mês'], anual: ['Faturado no ano'] } });
+  assert.equal(lido.linhas.length, meses.length + 1);
+});
