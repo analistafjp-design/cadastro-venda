@@ -56,8 +56,8 @@ Cinco abas (a de Tratativas só no Interior), no estilo do painel de Pós-Corte 
   - **Bases**: percorrido, com resultados e efetividade de cada base (projeto). A linha **SOLICITADA EM CAMPO** reúne as atividades que não são de nenhuma base (pedidos do atendimento, solicitações das próprias equipes); o filtro *Ocultar “SOLICITADA EM CAMPO”* as tira da análise;
   - **Resultado por equipe**: só as equipes que trouxeram resultado no período (resultado maior que zero). O **+** sob o nome abre os serviços que trouxeram resultado e a quantidade;
   - **Por data**: dia, semana ou mês. Datas recentes aparecem como *em maturação* (o backoffice ainda está lançando).
-- **Tempos das equipes** — das equipes que trouxeram resultado no período: **deslocamento**, **serviço**, **pausas e apoio** (refeição, DDS, checklist...) e **ociosidade**, em horas:minutos, com a média por dia trabalhado (ou o total do período) e uma barra de como o dia foi usado, com o percentual escrito em cada trecho.
 - **Tratativas** — o que o backoffice incrementou e decrementou, **em R$** (a página *TRATATIVAS* do relatório do Power BI, agora no painel). Lê só a planilha de Resultados (não precisa das atividades): **Incremento de economia**, **Decremento de economia**, **Incremento de categoria** e **Decremento de categoria** (De/Para ou Anterior/Atual, quantidade e valor com uma barra proporcional, e o total de cada quadro na base; incrementos à esquerda, decrementos à direita), uma faixa de resumo com o **saldo** do período, os incrementos e decrementos e os números de tratativas (acumulado, dias e média por dia), o **saldo por mês** (com o **faturado no ano**: o saldo do mês × os meses que faltam até dezembro; a última linha é o **Total** de cada coluna) e a **conferência** dos dados (o que está inconsistente no formulário; fica só na tela, não vai para o PDF). Filtros: período, **Mês** e **Assistente**. As tarifas e as regras ficam em `js/regras.js` (`tratativas`) e batem com o relatório ao centavo, salvo as poucas exceções listadas (linhas repetidas, por exemplo) em [`docs/REGRAS.md`](docs/REGRAS.md) § 6.4. Experimente com `exemplos/exemplo-tratativas.xlsx`.
+- **Tempos das equipes** — das equipes que trouxeram resultado no período: **deslocamento**, **serviço**, **pausas e apoio** (refeição, DDS, checklist...) e **ociosidade**, em horas:minutos, com a média por dia trabalhado (ou o total do período) e uma barra de como o dia foi usado, com o percentual escrito em cada trecho.
 - **Novos alvos** — listas de ação exportáveis em Excel:
   - *Revisitar*: última visita parou em cliente ausente / retornar depois / imóvel fechado, ordenadas pela **chance estimada** (taxa histórica do projeto × nº de economias);
   - *Corrigir endereço*: "endereço não localizado" (ação do backoffice);
@@ -97,7 +97,7 @@ O app é um site estático, sem build. No GitHub: *Settings → Pages → Deploy
 ## Desenvolvimento
 
 ```bash
-npm test                         # 150 testes (Node 18+; sem dependências)
+npm test                         # 151 testes (Node 18+; sem dependências)
 python3 tests/fixtures/gerar.py  # regenera as planilhas sintéticas (requer openpyxl)
 ```
 

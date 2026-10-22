@@ -696,7 +696,7 @@
     renderPainel();
   }
 
-  const ABAS = [['visao', 'Visão geral'], ['tempos', 'Tempos das equipes'], ['tratativas', 'Tratativas'], ['alvos', 'Novos alvos'], ['auditoria', 'Auditoria']];
+  const ABAS = [['visao', 'Visão geral'], ['tratativas', 'Tratativas'], ['tempos', 'Tempos das equipes'], ['alvos', 'Novos alvos'], ['auditoria', 'Auditoria']];
 
   /** Troca de aba. Os atalhos de período (7 dias, Mês...) valem para o dado de cada aba: são refeitos. */
   function abrirAba(id) {

@@ -109,7 +109,6 @@
       linhas: meses, total: meses.length ? Object.assign(CV.tratativas.totalDosMeses(meses), { ehTotal: true }) : null, totalEmbaixo: true,
       ordem: ordemDe('tratativas-meses', { id: 'mes', dir: 'desc' }), vazio: 'Nenhum mês com lançamento.',
     }));
-    b.appendChild(h('p', { class: 'nota', text: 'Faturado no ano = saldo do mês × os meses que faltam até dezembro (12 − o mês). Exemplo: saldo de março R$ 1.000,00 × 9 = R$ 9.000,00.' }));
     return b;
   }
 
