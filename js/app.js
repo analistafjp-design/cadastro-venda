@@ -843,7 +843,14 @@
         h('b', { text: estado.pasta ? 'Atualizar' : 'Carregar pasta' }), '.'));
       return;
     }
-    CV.ui.renderNegociacoes(alvo, { tabela: CV.negociacoes.porEquipe(negociacoesFiltradas()), ordemDe });
+    const lista = negociacoesFiltradas();
+    CV.ui.renderNegociacoes(alvo, {
+      tabela: CV.negociacoes.porEquipe(lista),
+      meses: CV.negociacoes.porMes(CV.negociacoes.filtrar(estado.negociacoes, { equipe: estado.filtros.equipe })),
+      diferencas: CV.negociacoes.diferencasPowerBI(lista),
+      igualPowerBI: !!R.negociacoes.igualPowerBI,
+      ordemDe,
+    });
   }
 
   function ordemDe(id, padrao) {
@@ -938,11 +945,14 @@
     const f = estado.filtros;
     return baixarExcel('negociacoes_' + periodoTxt(), [
       CV.exporta.abaNegociacoesEquipe(CV.negociacoes.porEquipe(lista)),
+      CV.exporta.abaNegociacoesMes(CV.negociacoes.porMes(CV.negociacoes.filtrar(estado.negociacoes, { equipe: f.equipe }))),
       CV.exporta.abaNegociacoes(lista),
       CV.exporta.abaFiltros([
         ['Período', f.de || f.ate ? (f.de ? fmt.longa(f.de) : 'início') + ' a ' + (f.ate ? fmt.longa(f.ate) : 'último dia') : 'Todo o período'],
         ['Equipe', f.equipe || 'Todas as do escopo'],
         ['Negociação', 'Status Finalizada e “Negociou O Débito?” = ' + R.negociacoes.respostas.join(' ou ')],
+        ['Valor', R.negociacoes.igualPowerBI ? 'Fórmula do Power BI (dígitos ÷ 100; texto com letras = 0)' : 'Como está escrito no “Valor Total dos Débitos”'],
+        ['Negociação por mês', 'Todos os meses (o filtro de período não vale nessa aba)'],
         ['Equipes do escopo', R.escopo.equipes.join(', ')],
       ]),
     ]);
