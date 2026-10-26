@@ -63,8 +63,7 @@
      *
      * igualPowerBI: false (padrão) lê o valor como está escrito ("R$ 1.234,56 à vista" = 1.234,56;
      * "500" = 500,00). true copia a fórmula do relatório (só os dígitos ÷ 100, ou R$ 0,00 se o texto
-     * tiver letras ou outro símbolo), para os números baterem com o Power BI. Nos dois casos a aba lista
-     * as negociações em que os dois jeitos dão valores diferentes.
+     * tiver letras ou outro símbolo), para os números baterem com o Power BI. O Excel traz os dois valores.
      */
     negociacoes: {
       respostas: ['SIM'],
