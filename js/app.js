@@ -20,8 +20,9 @@
   // Muda quando a leitura das planilhas passa a guardar mais coisas (ex.: horários): os dados
   // antigos do navegador são descartados e relidos da pasta. A 3 (só nas páginas com a aba
   // Tratativas) acrescenta ANTERIOR, ATUAL, QUANTIDADE e Colaborador dos Resultados; a 4 (só nas
-  // páginas com a aba Negociações), "Negociou O Débito?" e "Valor Total dos Débitos" das Atividades.
-  const VERSAO_DADOS = PAG.negociacoes ? 4 : PAG.tratativas ? 3 : 2;
+  // páginas com a aba Negociações), "Negociou O Débito?" e "Valor Total dos Débitos" das Atividades; a 5,
+  // o valor escrito no "Parecer De Campo" das negociações (antes o parecer era guardado cortado).
+  const VERSAO_DADOS = PAG.negociacoes ? 5 : PAG.tratativas ? 3 : 2;
 
   const chaveEquipe = (r) => N.chave(r).replace(/ /g, '');
 

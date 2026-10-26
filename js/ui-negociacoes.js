@@ -43,8 +43,11 @@
       colunas: colunas(), linhas: t.linhas, total: t.linhas.length ? t.total : null, totalEmbaixo: true,
       ordem: ctx.ordemDe('negociacoes', { id: 'total', dir: 'desc' }), vazio: 'Nenhuma negociação neste período.',
     }));
+    if (t.total.doParecer > 0) {
+      b.appendChild(h('p', { class: 'nota', text: fmt.int(t.total.doParecer) + ' negociação(ões) sem “Valor Total dos Débitos” preenchido tiveram o valor tirado do “Parecer De Campo”. O Excel mostra o parecer de cada uma.' }));
+    }
     if (t.total.semValor > 0) {
-      b.appendChild(h('p', { class: 'nota', text: fmt.int(t.total.semValor) + ' negociação(ões) sem “Valor Total dos Débitos” preenchido: contam no total e no ticket médio, com R$ 0,00. O Excel traz a lista.' }));
+      b.appendChild(h('p', { class: 'nota', text: fmt.int(t.total.semValor) + ' negociação(ões) sem valor nem no “Valor Total dos Débitos” nem no “Parecer De Campo”: contam no total e no ticket médio, com R$ 0,00. O Excel traz a lista.' }));
     }
     alvo.appendChild(b);
     if (ctx.meses) alvo.appendChild(blocoMeses(ctx.meses, ctx.ordemDe));

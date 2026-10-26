@@ -209,7 +209,7 @@ def linhas_resultados_vcg():
 
 CAB_NEG = [
     "Recurso", "ID da Atividade", "Matrícula", "Data", "Status da Atividade", "Tipo de Atividade", "Cidade", "Bairro",
-    "Observação", "Negociou O Débito?", "Forma De Negociação", "Valor Total dos Débitos",
+    "Observação", "Negociou O Débito?", "Forma De Negociação", "Valor Total dos Débitos", "Parecer De Campo",
 ]
 
 
@@ -223,19 +223,23 @@ def linhas_negociacoes():
     Setembro: RIORECIN-004 1 (R$ 200,00); RIOVENIN-002 1 ("R$ 300", sem centavos: R$ 3,00 no Power BI).
     Agosto: RIORECIN-007 1 ("R$ 238,23 em 3x": o Power BI não lê o texto e conta R$ 0,00).
     Fórmula do Power BI (dígitos ÷ 100): a 4 (1000,5 numérico) vira R$ 100,05 e a 9 ("1234.5") R$ 123,45.
+    Sem "Valor Total dos Débitos", o valor sai do "Parecer De Campo": a 5 (outubro, "R$ 812,40 em 6x de R$ 135,40")
+    vale R$ 812,40 e a 15 (agosto, "DEBITO NEGOCIADO 1.250,00 ENTRADA 125,00") R$ 1.250,00; a 14 (setembro)
+    não tem valor no parecer e fica sem valor.
     """
     f, oc = "Finalizada", "Encerrada com Ocorrência"
     vc, venda = "Verificação Cadastral", "Venda Potenciais/Factíveis"
 
-    def r(id_, rec, mat, dia, st, neg, valor, tipo=vc, cidade="MIRACEMA", forma="À vista"):
-        return [rec, 80000000 + id_, mat, D(2026, dia[0], dia[1]), st, tipo, cidade, "CENTRO", OBS_VIDA_NOVA, neg, forma if neg else None, valor]
+    def r(id_, rec, mat, dia, st, neg, valor, tipo=vc, cidade="MIRACEMA", forma="À vista", parecer="Cliente atendido."):
+        return [rec, 80000000 + id_, mat, D(2026, dia[0], dia[1]), st, tipo, cidade, "CENTRO", OBS_VIDA_NOVA, neg, forma if neg else None, valor, parecer]
 
     return [
         r(1, "RIORECIN-013", 100000201, (10, 1), f, "SIM", "R$ 1.234,56"),
         r(2, "RIORECIN-013", 100000202, (10, 2), f, "Sim ", "645,15", forma="Parcelado"),
         r(3, "RIORECIN-013", 100000203, (10, 3), f, "sim", "R$ 120,29"),
         r(4, "RIOVENIN-004", 100000204, (10, 5), f, "SIM", 1000.5, tipo=venda),
-        r(5, "RIOVENIN-004", 100000205, (10, 6), f, "SIM", None, tipo=venda),
+        r(5, "RIOVENIN-004", 100000205, (10, 6), f, "SIM", None, tipo=venda,
+          parecer="Cliente negociou o débito de R$ 812,40 em 6x de R$ 135,40, leitura 1234,56."),
         r(6, "RIORECIN-007", 100000206, (10, 7), oc, "SIM", "R$ 900,00"),
         r(7, "RIORECIN-007", 100000207, (10, 7), f, "NÃO", "R$ 300,00"),
         r(8, "RIOCORTE-001", 100000208, (10, 8), f, "SIM", "R$ 5.000,00"),
@@ -244,6 +248,8 @@ def linhas_negociacoes():
         r(11, "RIOVENIN-001", 100000211, (10, 10), f, None, "R$ 50,00"),
         r(12, "RIORECIN-007", 100000212, (8, 20), f, "SIM", "R$ 238,23 em 3x"),
         r(13, "RIOVENIN-002", 100000213, (9, 20), f, "SIM", "R$ 300"),
+        r(14, "RIORECIN-004", 100000214, (9, 16), f, "SIM", None, parecer="Negociado, cliente vai pagar na agência dia 10/10."),
+        r(15, "RIORECIN-007", 100000215, (8, 21), f, "SIM", None, parecer="DEBITO NEGOCIADO 1.250,00 ENTRADA 125,00"),
     ]
 
 

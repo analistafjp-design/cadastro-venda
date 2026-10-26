@@ -45,22 +45,41 @@
     return Number.isFinite(n) ? n : 0;
   }
 
+  const tem = (v) => v !== null && v !== undefined;
+
+  /**
+   * De onde vem o valor da negociação: 'debitos' ("Valor Total dos Débitos"), 'parecer' (o valor escrito
+   * no "Parecer De Campo", quando o outro está vazio) ou null (nenhum dos dois). Com igualPowerBI, só o primeiro.
+   */
+  function origemValor(a) {
+    if (tem(a.valorDebitos)) return 'debitos';
+    if (!CV.regras.negociacoes.igualPowerBI && tem(a.valorParecer)) return 'parecer';
+    return null;
+  }
+
   /** O valor que entra nas contas: o lido pelo painel ou, com regras.negociacoes.igualPowerBI, o do relatório. */
   function valorDe(a) {
     if (CV.regras.negociacoes.igualPowerBI) return valorPowerBI(a);
-    return a.valorDebitos === null || a.valorDebitos === undefined ? 0 : a.valorDebitos;
+    const o = origemValor(a);
+    return o === 'debitos' ? a.valorDebitos : o === 'parecer' ? a.valorParecer : 0;
   }
 
-  /** Total, valor, ticket médio e quantas vieram sem valor (contam na quantidade, não no valor). */
+  /**
+   * Total, valor, ticket médio, quantas tiveram o valor tirado do parecer (`doParecer`) e quantas ficaram sem
+   * valor nenhum (`semValor`: contam na quantidade e no ticket, com R$ 0,00).
+   */
   function somar(lista) {
     let valor = 0;
     let semValor = 0;
+    let doParecer = 0;
     for (const a of lista) {
-      if (a.valorDebitos === null || a.valorDebitos === undefined) semValor++;
+      const o = origemValor(a);
+      if (o === null) semValor++;
+      else if (o === 'parecer') doParecer++;
       valor += valorDe(a);
     }
     valor = Math.round(valor * 100) / 100;
-    return { total: lista.length, valor, ticket: lista.length ? valor / lista.length : 0, semValor };
+    return { total: lista.length, valor, ticket: lista.length ? valor / lista.length : 0, semValor, doParecer };
   }
 
   /**
@@ -114,6 +133,6 @@
     return out.reverse();
   }
 
-  CV.negociacoes = { ehNegociacao, preparar, filtrar, valorPowerBI, valorDe, somar, porEquipe, porMes, limites, mesesEntre };
+  CV.negociacoes = { ehNegociacao, preparar, filtrar, valorPowerBI, origemValor, valorDe, somar, porEquipe, porMes, limites, mesesEntre };
   if (typeof module !== 'undefined' && module.exports) module.exports = CV.negociacoes;
 })(typeof window !== 'undefined' ? window : globalThis);

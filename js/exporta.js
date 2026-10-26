@@ -12,6 +12,7 @@
   const STATUS = { exec: 'Executada', oc: 'Encerrada com Ocorrência', outra: 'Não concluída' };
   const RETORNO = { resultado: 'Resultado', atualizacao: 'Atualização cadastral', sem: 'Sem tratativa' };
   const sim = (b) => (b ? 'Sim' : 'Não');
+  const ORIGEM_VALOR = { debitos: 'Valor Total dos Débitos', parecer: 'Parecer De Campo' };
 
   function rotulosDeResultado(v) {
     if (v.grupoStatus !== 'exec' || v.grupoRetorno !== 'resultado') return '';
@@ -186,6 +187,7 @@
         { titulo: 'Total negociação', tipo: 'num', valor: (l) => l.total },
         { titulo: 'Valor negociado (R$)', tipo: 'num', valor: (l) => l.valor },
         { titulo: 'Ticket médio (R$)', tipo: 'num', valor: (l) => Math.round(l.ticket * 100) / 100 },
+        { titulo: 'Valor tirado do Parecer', tipo: 'num', valor: (l) => l.doParecer || null },
         { titulo: 'Sem valor informado', tipo: 'num', valor: (l) => l.semValor || null },
       ],
       linhas: tabela.linhas.length ? tabela.linhas.concat([tabela.total]) : [],
@@ -201,6 +203,7 @@
         { titulo: 'Total negociação', tipo: 'num', valor: (l) => l.total },
         { titulo: 'Valor negociado (R$)', tipo: 'num', valor: (l) => l.valor },
         { titulo: 'Ticket médio (R$)', tipo: 'num', valor: (l) => Math.round(l.ticket * 100) / 100 },
+        { titulo: 'Valor tirado do Parecer', tipo: 'num', valor: (l) => l.doParecer || null },
         { titulo: 'Sem valor informado', tipo: 'num', valor: (l) => l.semValor || null },
       ],
       linhas: meses.linhas.length ? meses.linhas.concat([meses.total]) : [],
@@ -215,6 +218,9 @@
       colunas: colunasAtividade().filter((c) => !fora.includes(c.titulo)).concat([
         { titulo: 'Negociou O Débito?', valor: (a) => a.negociou },
         { titulo: 'Valor Total dos Débitos', valor: (a) => (a.valorDebitosTxt !== null && a.valorDebitosTxt !== undefined ? a.valorDebitosTxt : a.valorDebitos) },
+        { titulo: 'Parecer De Campo', valor: (a) => a.parecerNegociacao },
+        { titulo: 'Valor no Parecer (R$)', tipo: 'num', valor: (a) => a.valorParecer },
+        { titulo: 'Origem do valor', valor: (a) => ORIGEM_VALOR[CV.negociacoes.origemValor(a)] || 'Sem valor' },
         { titulo: 'Valor negociado (R$)', tipo: 'num', valor: (a) => CV.negociacoes.valorDe(a) },
         { titulo: 'Valor no Power BI (R$)', tipo: 'num', valor: (a) => CV.negociacoes.valorPowerBI(a) },
       ]),
