@@ -1,6 +1,6 @@
 /*
  * app.js — controlador da interface: carga de arquivos, estado, filtros e abas
- * (Visão geral · Tempos das equipes · Novos alvos · Auditoria).
+ * (Visão geral · Tratativas · Negociações · Tempos das equipes · Novos alvos · Auditoria).
  */
 (function () {
   'use strict';
@@ -19,8 +19,9 @@
 
   // Muda quando a leitura das planilhas passa a guardar mais coisas (ex.: horários): os dados
   // antigos do navegador são descartados e relidos da pasta. A 3 (só nas páginas com a aba
-  // Tratativas) acrescenta ANTERIOR, ATUAL, QUANTIDADE e Colaborador dos Resultados.
-  const VERSAO_DADOS = PAG.tratativas ? 3 : 2;
+  // Tratativas) acrescenta ANTERIOR, ATUAL, QUANTIDADE e Colaborador dos Resultados; a 4 (só nas
+  // páginas com a aba Negociações), "Negociou O Débito?" e "Valor Total dos Débitos" das Atividades.
+  const VERSAO_DADOS = PAG.negociacoes ? 4 : PAG.tratativas ? 3 : 2;
 
   const chaveEquipe = (r) => N.chave(r).replace(/ /g, '');
 
@@ -40,7 +41,8 @@
     datas: { min: null, max: null },
     tratativas: [], // lançamentos prontos para a aba Tratativas (só Interior)
     datasTratativas: { min: null, max: null },
-    opcoes: { cidades: [], equipes: [], bases: [], assistentes: [], meses: [] },
+    negociacoes: [], // atividades finalizadas com débito negociado, para a aba Negociações (só Interior)
+    opcoes: { cidades: [], equipes: [], bases: [], assistentes: [], meses: [], mesesNegociacoes: [] },
     filtros: { preset: 'mes', de: null, ate: null, cidade: null, equipe: null, base: null, assistente: null, semAvulsas: false },
     refs: {},
     gran: 'dia',
@@ -384,6 +386,7 @@
     estado.agenda = [];
     estado.tratativas = [];
     estado.datasTratativas = { min: null, max: null };
+    estado.negociacoes = [];
     if (estado.pasta) estado.pasta.ultima = null;
     $('mensagens').textContent = '';
     renderTudo();
@@ -409,6 +412,7 @@
     estado.tratativas = PAG.tratativas ? CV.tratativas.preparar(rs) : [];
     const optTrat = CV.tratativas.opcoes(estado.tratativas);
     estado.datasTratativas = { min: optTrat.min, max: optTrat.max };
+    estado.negociacoes = PAG.negociacoes ? CV.negociacoes.preparar(at) : [];
     estado.modelo = M.criarModeloChance(estado.visitas);
     estado.totalPercorrido = M.resumo(estado.visitas).percorrido;
 
@@ -435,7 +439,10 @@
       bases: Array.from(bas.entries()).sort((a, b) => b[1] - a[1] || alfa(a[0], b[0])).map((x) => x[0]),
       assistentes: optTrat.assistentes,
       meses: optTrat.meses,
+      mesesNegociacoes: [],
     };
+    const limNeg = datasNegociacoes();
+    estado.opcoes.mesesNegociacoes = CV.negociacoes.mesesEntre(limNeg.min, limNeg.max);
     const f = estado.filtros;
     if (f.cidade && !estado.opcoes.cidades.includes(f.cidade)) f.cidade = null;
     if (f.base && !estado.opcoes.bases.includes(f.base)) f.base = null;
@@ -451,9 +458,20 @@
     return Array.from(estado.resultados.values()).filter((r) => r.equipe && CV.escopo.equipeNoEscopo(r.equipe));
   }
 
+  /** Negociações: os dias das atividades das equipes e os das próprias negociações ("Mês" = o mês do dado mais novo). */
+  function datasNegociacoes() {
+    const n = CV.negociacoes.limites(estado.negociacoes);
+    const { min, max } = estado.datas;
+    return {
+      min: [min, n.min].filter(Boolean).sort()[0] || null,
+      max: [max, n.max].filter(Boolean).sort().pop() || null,
+    };
+  }
+
   /** Primeiro e último dia com dado: visitas e tempos e, no VCG, também os lançamentos (que valem sem visita). */
   function limitesDatas() {
     if (estado.aba === 'tratativas') return estado.datasTratativas; // a aba Tratativas tem as datas do próprio formulário
+    if (estado.aba === 'negociacoes') return datasNegociacoes();
     let { min, max } = estado.datas;
     for (const r of lancamentosDoPainel()) {
       if (!r.data) continue;
@@ -574,10 +592,19 @@
       if (estado.opcoes.assistentes.length) alvo.appendChild(campo('Assistente', seletor('assistente', 'Assistente', 'Todos os assistentes', estado.opcoes.assistentes, false)));
       return;
     }
+    if (estado.aba === 'negociacoes') {
+      // as negociações valem por equipe (como no relatório): cidade e base não se aplicam
+      alvo.appendChild(campo('Mês', seletorMes(refs)));
+      alvo.appendChild(campo('Equipe', seletor('equipe', 'Equipe', 'Todas as equipes', estado.opcoes.equipes, false)));
+      return;
+    }
     alvo.appendChild(campo('Cidade', seletor('cidade', 'Cidade', 'Todas as cidades', estado.opcoes.cidades, semTerritorio)));
     alvo.appendChild(campo('Equipe', seletor('equipe', 'Equipe', 'Todas as equipes', estado.opcoes.equipes, false)));
     alvo.appendChild(campo('Base', seletor('base', 'Base', 'Todas as bases', estado.opcoes.bases, semTerritorio)));
   }
+
+  /** Os meses do seletor "Mês" da aba aberta (Tratativas: os do formulário; Negociações: os das atividades). */
+  const mesesDaAba = () => (estado.aba === 'negociacoes' ? estado.opcoes.mesesNegociacoes : estado.opcoes.meses);
 
   /** O mês do período escolhido ('2026-10'), se as duas datas estão no mesmo mês; senão vazio. */
   function mesDoPeriodo() {
@@ -590,8 +617,8 @@
     const f = estado.filtros;
     const sel = h('select', { attrs: { 'aria-label': 'Mês' } },
       h('option', { value: '', text: 'Todos os meses' }),
-      estado.opcoes.meses.map((m) => h('option', { value: m, text: CV.tratativas.rotuloMes(m) })));
-    sel.value = estado.opcoes.meses.includes(mesDoPeriodo()) ? mesDoPeriodo() : '';
+      mesesDaAba().map((m) => h('option', { value: m, text: CV.tratativas.rotuloMes(m) })));
+    sel.value = mesesDaAba().includes(mesDoPeriodo()) ? mesDoPeriodo() : '';
     sel.addEventListener('change', () => {
       if (!sel.value) aplicarPreset('tudo');
       else {
@@ -616,7 +643,7 @@
     if (r.de) r.de.value = f.de || '';
     if (r.ate) r.ate.value = f.ate || '';
     for (const k of ['cidade', 'equipe', 'base', 'assistente']) if (r[k]) r[k].value = f[k] || '';
-    if (r.mes) r.mes.value = estado.opcoes.meses.includes(mesDoPeriodo()) ? mesDoPeriodo() : '';
+    if (r.mes) r.mes.value = mesesDaAba().includes(mesDoPeriodo()) ? mesDoPeriodo() : '';
   }
 
   function mudouFiltro() {
@@ -639,7 +666,9 @@
     alvo.appendChild(h('span', { class: 'sep' }));
     const semTerritorio = estado.aba === 'tempos';
     // cada aba mostra só os filtros que valem para ela
-    const filtrosDaAba = estado.aba === 'tratativas' ? [['assistente', 'Assistente']] : [['equipe', 'Equipe'], ['cidade', 'Cidade'], ['base', 'Base']];
+    const filtrosDaAba = estado.aba === 'tratativas' ? [['assistente', 'Assistente']]
+      : estado.aba === 'negociacoes' ? [['equipe', 'Equipe']]
+        : [['equipe', 'Equipe'], ['cidade', 'Cidade'], ['base', 'Base']];
     const ativos = filtrosDaAba.filter(([k]) => f[k] && !(semTerritorio && k !== 'equipe'));
     for (const [k, rotulo] of ativos) {
       alvo.appendChild(h('span', { class: 'chip' }, rotulo + ': ' + f[k],
@@ -664,7 +693,7 @@
   function renderTudo() {
     const temLancamentos = lancamentosDoPainel().length > 0; // VCG: os lançamentos já dizem o que as equipes trouxeram
     // Interior: as tratativas também valem só com a planilha de Resultados, sem nenhuma atividade
-    const temDados = !!(estado.cruzado && (estado.cruzado.visitas.length || estado.agenda.length)) || temLancamentos || estado.tratativas.length > 0;
+    const temDados = !!(estado.cruzado && (estado.cruzado.visitas.length || estado.agenda.length)) || temLancamentos || estado.tratativas.length > 0 || estado.negociacoes.length > 0;
     $('vazio').hidden = temDados;
     $('app').hidden = !temDados;
     $('abas').hidden = !temDados;
@@ -696,7 +725,7 @@
     renderPainel();
   }
 
-  const ABAS = [['visao', 'Visão geral'], ['tratativas', 'Tratativas'], ['tempos', 'Tempos das equipes'], ['alvos', 'Novos alvos'], ['auditoria', 'Auditoria']];
+  const ABAS = [['visao', 'Visão geral'], ['tratativas', 'Tratativas'], ['negociacoes', 'Negociações'], ['tempos', 'Tempos das equipes'], ['alvos', 'Novos alvos'], ['auditoria', 'Auditoria']];
 
   /** Troca de aba. Os atalhos de período (7 dias, Mês...) valem para o dado de cada aba: são refeitos. */
   function abrirAba(id) {
@@ -714,6 +743,7 @@
     alvo.textContent = '';
     for (const [id, nome] of ABAS) {
       if (id === 'tratativas' && !PAG.tratativas) continue;
+      if (id === 'negociacoes' && !PAG.negociacoes) continue;
       alvo.appendChild(h('button', {
         type: 'button', role: 'tab', text: nome, attrs: { 'aria-selected': String(estado.aba === id) },
         on: { click: () => abrirAba(id) },
@@ -724,6 +754,7 @@
   function renderPainel() {
     const alvo = $('painel');
     alvo.textContent = '';
+    if (estado.aba === 'negociacoes') { renderNegociacoes(alvo); return; } // vem só das Atividades: não depende dos Resultados
     if (!estado.resultados.size && estado.aba !== 'auditoria') {
       // sem a planilha de Resultados não há o que cruzar: avisa o que falta nesta página
       alvo.appendChild(h('p', { class: 'explica' }, h('b', { text: 'Ainda não há retornos do backoffice. ' }),
@@ -799,6 +830,20 @@
       meses: CV.tratativas.porMes(estado.tratativas, { assistente: estado.filtros.assistente }),
       ordemDe,
     });
+  }
+
+  // ---- Negociações (débitos negociados por equipe: quantidade, valor e ticket médio)
+
+  const negociacoesFiltradas = () => CV.negociacoes.filtrar(estado.negociacoes, { de: estado.filtros.de, ate: estado.filtros.ate, equipe: estado.filtros.equipe });
+
+  function renderNegociacoes(alvo) {
+    if (!estado.negociacoes.length) {
+      alvo.appendChild(h('p', { class: 'explica' }, h('b', { text: 'Nenhuma negociação de débito nas Atividades carregadas. ' }),
+        'Esta aba conta as atividades finalizadas das equipes com “Negociou O Débito?” = Sim e soma o “Valor Total dos Débitos”. Essas colunas vêm na exportação completa do sistema (não na planilha “Cadastrais”): coloque-a na pasta e clique em ',
+        h('b', { text: estado.pasta ? 'Atualizar' : 'Carregar pasta' }), '.'));
+      return;
+    }
+    CV.ui.renderNegociacoes(alvo, { tabela: CV.negociacoes.porEquipe(negociacoesFiltradas()), ordemDe });
   }
 
   function ordemDe(id, padrao) {
@@ -887,8 +932,25 @@
     ]);
   }
 
+  /** Negociações: a tabela por equipe e uma linha por negociação (formato Atividades, com o valor). */
+  function exportarNegociacoes() {
+    const lista = negociacoesFiltradas();
+    const f = estado.filtros;
+    return baixarExcel('negociacoes_' + periodoTxt(), [
+      CV.exporta.abaNegociacoesEquipe(CV.negociacoes.porEquipe(lista)),
+      CV.exporta.abaNegociacoes(lista),
+      CV.exporta.abaFiltros([
+        ['Período', f.de || f.ate ? (f.de ? fmt.longa(f.de) : 'início') + ' a ' + (f.ate ? fmt.longa(f.ate) : 'último dia') : 'Todo o período'],
+        ['Equipe', f.equipe || 'Todas as do escopo'],
+        ['Negociação', 'Status Finalizada e “Negociou O Débito?” = ' + R.negociacoes.respostas.join(' ou ')],
+        ['Equipes do escopo', R.escopo.equipes.join(', ')],
+      ]),
+    ]);
+  }
+
   function exportarAtual() {
     if (estado.aba === 'tratativas') return exportarTratativas();
+    if (estado.aba === 'negociacoes') return exportarNegociacoes();
     if (estado.aba === 'tempos') return exportarTempos();
     if (estado.aba === 'alvos' && estado.exportaAlvo) return estado.exportaAlvo();
     return exportarCruzamento();
@@ -1288,7 +1350,7 @@
     // pasta lembrada e com acesso ainda válido: já traz o que for novo, sem precisar clicar
     if (estado.pasta && temSeletorDePasta() && (await permissaoDaPasta(false))) await lerPasta(true);
     if (estado.precisaRelerPasta && !estado.atividades.size) {
-      mensagem('aviso', 'O painel foi atualizado (agora com horários, equipes, cidades e tratativas). Os dados guardados antes precisam ser lidos de novo: clique em “' + (estado.pasta ? 'Atualizar' : 'Carregar pasta') + '”.');
+      mensagem('aviso', 'O painel foi atualizado (agora com horários, equipes, cidades, tratativas e negociações). Os dados guardados antes precisam ser lidos de novo: clique em “' + (estado.pasta ? 'Atualizar' : 'Carregar pasta') + '”.');
     }
   }
 

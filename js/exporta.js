@@ -177,6 +177,35 @@
     };
   }
 
+  /** Negociações: a tabela da tela (uma linha por equipe e o total na última). */
+  function abaNegociacoesEquipe(tabela) {
+    return {
+      nome: 'Negociação por equipe',
+      colunas: [
+        { titulo: 'Recurso', valor: (l) => l.recurso },
+        { titulo: 'Total negociação', tipo: 'num', valor: (l) => l.total },
+        { titulo: 'Valor negociado (R$)', tipo: 'num', valor: (l) => l.valor },
+        { titulo: 'Ticket médio (R$)', tipo: 'num', valor: (l) => Math.round(l.ticket * 100) / 100 },
+        { titulo: 'Sem valor informado', tipo: 'num', valor: (l) => l.semValor || null },
+      ],
+      linhas: tabela.linhas.length ? tabela.linhas.concat([tabela.total]) : [],
+    };
+  }
+
+  /** Negociações: uma linha por atividade (colunas da planilha de Atividades), com a resposta e o valor. */
+  function abaNegociacoes(lista) {
+    const fora = ['Projeto (base)', 'Motivo de Não Execução - Normal', 'Quantidade De Economia'];
+    return {
+      nome: 'Negociações',
+      colunas: colunasAtividade().filter((c) => !fora.includes(c.titulo)).concat([
+        { titulo: 'Negociou O Débito?', valor: (a) => a.negociou },
+        { titulo: 'Valor Total dos Débitos', valor: (a) => (a.valorDebitosTxt !== null && a.valorDebitosTxt !== undefined ? a.valorDebitosTxt : a.valorDebitos) },
+        { titulo: 'Valor negociado (R$)', tipo: 'num', valor: (a) => a.valorDebitos },
+      ]),
+      linhas: lista,
+    };
+  }
+
   /** Aba "Filtros": o recorte que gerou o arquivo. */
   function abaFiltros(pares) {
     return {
@@ -186,6 +215,6 @@
     };
   }
 
-  CV.exporta = { colunasAtividade, colunasCruzamento, abaVisitas, abaAgenda, abaDias, abaTratativas, abaQuadros, abaMeses, abaFiltros, rotulosDeResultado };
+  CV.exporta = { colunasAtividade, colunasCruzamento, abaVisitas, abaAgenda, abaDias, abaTratativas, abaQuadros, abaMeses, abaNegociacoesEquipe, abaNegociacoes, abaFiltros, rotulosDeResultado };
   if (typeof module !== 'undefined' && module.exports) module.exports = CV.exporta;
 })(typeof window !== 'undefined' ? window : globalThis);

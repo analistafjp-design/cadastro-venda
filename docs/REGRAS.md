@@ -23,6 +23,7 @@ Os arquivos são lidos **pelo nome do cabeçalho** (sem diferenciar maiúsculas,
 | Cidade, Bairro, Área de Trabalho, Endereço | Território e listas de ação | não |
 | Motivo de Não Execução - Normal | Define o que é revisitável | não |
 | Categoria, Quantidade De Economia, Situação Do Imóvel | Perfil do alvo | não |
+| Negociou O Débito?, Valor Total dos Débitos | Aba **Negociações** (§ 6.5); só vêm na exportação completa do sistema | não |
 
 \* Sem a *Observação* tudo cai em "SOLICITADA EM CAMPO" e a análise por base perde o sentido.
 
@@ -264,6 +265,22 @@ Conferido contra os dados do próprio relatório (17,6 mil linhas): mês a mês,
 **Conferência dos dados** (rodapé da aba e coluna *Observação* do Excel; **não sai no PDF**: o bloco leva a classe `so-tela`, escondida pela impressão): lançamentos de outra frente que ficam de fora; marcados como *Incremento* com PARA < DE (entram no decremento); marcados como *Decremento* com PARA > DE (ficam de fora); DE e PARA de categorias diferentes; categoria sem tarifa; categoria alterada **sem QUANTIDADE** (valor zero); e os dois itens do `igualPowerBI`. Nenhum é corrigido sozinho: o painel só mostra onde estão.
 
 **Excel:** abas *Quadros* (grupos, totais e saldo), *Saldo por mês* (com *Meses até dezembro* e *Faturado no ano*), *Tratativas* (uma linha por evento de valor: data, Id, matrícula, assistente, quadro, categorias, economias, valor em R$, textos de DE/PARA/ANTERIOR/ATUAL e *Observação*) e *Filtros* (com as tarifas usadas).
+
+## 6.5 Aba Negociações (débitos negociados por equipe)
+
+É a tabela **Negociação - venda e recadastro** (página ADR) do relatório do Power BI: medidas `Total Negociação`, `Negociação Valor` e `Ticket Médio`. Só a página Interior tem a aba. Vem só das **Atividades** (exportação completa do sistema); não depende dos Resultados nem do cruzamento.
+
+- **Negociação** = atividade com status **Finalizada**, de uma das **10 equipes** do escopo, com *Negociou O Débito?* = **Sim** (sem diferenciar maiúsculas, acentos e espaços nas pontas; a lista de respostas aceitas fica em `negociacoes.respostas` em `regras.js`). Como no relatório, **só a equipe filtra**: a cidade não (uma negociação de uma equipe do interior fora das 12 cidades conta). Uma atividade repetida em mais de um arquivo (mesmo ID) conta uma vez.
+- **Total negociação** = número dessas atividades. **Valor negociado** = soma do *Valor Total dos Débitos*. **Ticket médio** = valor negociado ÷ total negociação.
+- **Valor**: aceita `R$ 1.234,56`, `645,15`, `1234.56`, `500` e célula numérica do Excel. Negociação **sem valor** (vazio ou sem número) conta no total e no ticket médio com R$ 0,00, como no relatório; a tela avisa quantas são e o Excel mostra quais.
+- Linhas: só as equipes que negociaram no período, da que mais negociou para a que menos; o **Total** fica na base.
+- Filtros: período, **Mês** (todos os meses entre o primeiro e o último dia com dado) e **Equipe**. Ao abrir, o período é o mês do dado mais recente (atalho *Mês*), como o filtro *Mes/Ano* do relatório.
+- **Excel**: aba *Negociação por equipe* (a tabela, com o total), aba *Negociações* (uma linha por atividade, com as colunas da planilha de Atividades, a resposta, o texto original do valor e o valor lido) e aba *Filtros*.
+
+### Onde o painel difere do relatório
+
+- O relatório lê o *Valor Total dos Débitos* tirando `R$` e os pontos, trocando a vírgula por ponto e dividindo por 100: a conta só fecha quando o valor vem escrito com os centavos (`1.234,56`). O painel lê o valor como está escrito: `500` é R$ 500,00 (e não R$ 5,00) e `1234.5` é R$ 1.234,50.
+- O relatório esconde a equipe cujo valor negociado é zero (filtro *Negociação Valor > 0* do visual); o painel a mostra, com o valor zerado, para a negociação sem valor não sumir da conta.
 
 ## 7. Listas de novos alvos
 

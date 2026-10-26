@@ -56,6 +56,16 @@
     },
 
     /**
+     * Aba "Negociações" (página Interior): a tabela "Negociação - venda e recadastro" do relatório
+     * do Power BI. Conta as atividades FINALIZADAS das equipes do escopo (só a equipe; a cidade não
+     * filtra, como no relatório) em que "Negociou O Débito?" é uma das respostas abaixo (chave sem
+     * acento). Valor = "Valor Total dos Débitos"; ticket médio = valor ÷ negociações.
+     */
+    negociacoes: {
+      respostas: ['SIM'],
+    },
+
+    /**
      * Aba "Tratativas": incremento e decremento de ECONOMIA (DE:/PARA:) e de CATEGORIA
      * (ANTERIOR/ATUAL × QUANTIDADE) lançados no formulário de Resultados, valorados pela tarifa da
      * categoria. É a mesma conta do relatório TRATATIVAS do Power BI; vem direto da planilha, sem

@@ -35,6 +35,9 @@
     fim: ['Fim'],
     duracao: ['Duração'],
     desloc: ['Tempo de Deslocamento'],
+    // negociação de débitos (aba Negociações; só na exportação completa do sistema)
+    negociou: ['Negociou O Débito?'],
+    valorDebitos: ['Valor Total dos Débitos'],
   };
   const OBRIGATORIOS_ATIVIDADES = ['id', 'mat', 'data', 'recurso', 'status'];
 
@@ -139,6 +142,9 @@
       fim: N().minutos(r.fim),
       duracao: N().minutos(r.duracao),
       desloc: N().minutos(r.desloc),
+      negociou: cortar(N().texto(r.negociou), 30),
+      valorDebitos: N().valorReais(r.valorDebitos),
+      valorDebitosTxt: typeof r.valorDebitos === 'number' ? null : cortar(N().texto(r.valorDebitos), 40),
     };
   }
 

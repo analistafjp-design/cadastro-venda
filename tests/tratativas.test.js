@@ -617,10 +617,11 @@ test('Excel do saldo por mês: a última linha é o total', async () => {
   assert.equal(lido.linhas.length, meses.length + 1);
 });
 
-test('abas: a Tratativas fica em segundo lugar, logo depois da Visão geral', () => {
+test('abas: a Tratativas fica em segundo lugar, logo depois da Visão geral (e a Negociações logo depois dela)', () => {
   const fonte = require('fs').readFileSync(require('path').join(__dirname, '..', 'js', 'app.js'), 'utf8');
   const lista = /const ABAS = \[(.*?)\];/.exec(fonte)[1];
   const ids = Array.from(lista.matchAll(/\['(\w+)',/g)).map((m) => m[1]);
-  assert.deepEqual(ids, ['visao', 'tratativas', 'tempos', 'alvos', 'auditoria']);
+  assert.deepEqual(ids, ['visao', 'tratativas', 'negociacoes', 'tempos', 'alvos', 'auditoria']);
   assert.match(fonte, /if \(id === 'tratativas' && !PAG\.tratativas\) continue;/); // no VCG a aba continua escondida
+  assert.match(fonte, /if \(id === 'negociacoes' && !PAG\.negociacoes\) continue;/);
 });
