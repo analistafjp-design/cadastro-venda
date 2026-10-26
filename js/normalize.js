@@ -149,6 +149,24 @@
     return Number.isFinite(n) ? n : null;
   }
 
+  /**
+   * Valor em reais escrito no meio de um texto livre (ex.: o "Parecer De Campo"), ou null.
+   * Vale o primeiro valor com "R$" na frente ("débito de R$ 1.500,00, entrada de R$ 150,00" -> 1500);
+   * sem "R$", o primeiro número com vírgula e dois centavos ("DEBITO 1.250,00" -> 1250 ; "812,40" -> 812.4).
+   */
+  function valorNoTexto(v) {
+    const t = texto(v);
+    if (t === null) return null;
+    const s = t.replace(/\u00a0/g, ' ');
+    const rs = /R\$\s*(\d[\d.,]*\d|\d)/i.exec(s);
+    if (rs) {
+      const n = valorReais(rs[1]);
+      if (n !== null && n > 0) return n;
+    }
+    const m = /(?<![\d.,])(\d{1,3}(?:\.\d{3})+|\d+),(\d{2})(?![\d,])/.exec(s);
+    return m ? Number(m[1].replace(/\./g, '') + '.' + m[2]) : null;
+  }
+
   /** minutos -> 'H:MM' (ex.: 481 -> '8:01'); null -> '–'. */
   function hhmm(min) {
     if (min === null || min === undefined || !Number.isFinite(min)) return '–';
@@ -210,7 +228,7 @@
 
   CV.normalize = {
     semAcento, chave, chaveCabecalho, texto, matricula, protocolo, data, serialParaIso,
-    diasEntre, somaDias, dataBR, inicioSemana, diaDaSemana, similaridade, p2, minutos, hhmm, valorReais,
+    diasEntre, somaDias, dataBR, inicioSemana, diaDaSemana, similaridade, p2, minutos, hhmm, valorReais, valorNoTexto,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = CV.normalize;
 })(typeof window !== 'undefined' ? window : globalThis);

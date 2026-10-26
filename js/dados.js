@@ -119,6 +119,7 @@
   function limparAtividade(r) {
     const id = N().texto(r.id);
     const mat = N().matricula(r.mat);
+    const negociou = cortar(N().texto(r.negociou), 30);
     return {
       id: id === null ? null : String(id).replace(/\.0+$/, ''),
       protocolo: N().protocolo(r.protocolo),
@@ -142,9 +143,12 @@
       fim: N().minutos(r.fim),
       duracao: N().minutos(r.duracao),
       desloc: N().minutos(r.desloc),
-      negociou: cortar(N().texto(r.negociou), 30),
+      negociou,
       valorDebitos: N().valorReais(r.valorDebitos),
       valorDebitosTxt: typeof r.valorDebitos === 'number' ? null : cortar(N().texto(r.valorDebitos), 40),
+      // só nas negociações: o valor escrito no parecer (quando falta o "Valor Total dos Débitos") e o parecer inteiro, para o Excel
+      valorParecer: negociou ? N().valorNoTexto(r.parecer) : null,
+      parecerNegociacao: negociou ? cortar(N().texto(r.parecer), 500) : null,
     };
   }
 

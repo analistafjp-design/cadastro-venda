@@ -18,7 +18,7 @@ Os arquivos são lidos **pelo nome do cabeçalho** (sem diferenciar maiúsculas,
 | Tipo de Atividade | *Verificação Cadastral* (e venda) são as visitas. As demais (corte...) só ficam se forem de uma equipe do escopo, para os tempos | não |
 | Início, Fim, Duração, Tempo de Deslocamento | Horários de cada atividade (aba *Tempos das equipes*) | não |
 | Observação | **Nome do projeto/base** (`PROJETO XXXX: ...`) | não* |
-| Parecer De Campo | Alternativa de leitura do projeto quando a *Observação* não traz um | não |
+| Parecer De Campo | Alternativa de leitura do projeto quando a *Observação* não traz um; nas negociações sem *Valor Total dos Débitos*, o valor negociado (§ 6.5) | não |
 | Cód. Protocolo Origem | Resgatar retornos lançados com o protocolo no lugar da matrícula | não |
 | Cidade, Bairro, Área de Trabalho, Endereço | Território e listas de ação | não |
 | Motivo de Não Execução - Normal | Define o que é revisitável | não |
@@ -272,11 +272,13 @@ Conferido contra os dados do próprio relatório (17,6 mil linhas): mês a mês,
 
 - **Negociação** = atividade com status **Finalizada**, de uma das **10 equipes** do escopo, com *Negociou O Débito?* = **Sim** (sem diferenciar maiúsculas, acentos e espaços nas pontas; a lista de respostas aceitas fica em `negociacoes.respostas` em `regras.js`). Como no relatório, **só a equipe filtra**: a cidade não (uma negociação de uma equipe do interior fora das 12 cidades conta). Uma atividade repetida em mais de um arquivo (mesmo ID) conta uma vez.
 - **Total negociação** = número dessas atividades. **Valor negociado** = soma do *Valor Total dos Débitos*. **Ticket médio** = valor negociado ÷ total negociação.
-- **Valor**: aceita `R$ 1.234,56`, `645,15`, `1234.56`, `500` e célula numérica do Excel. Negociação **sem valor** (vazio ou sem número) conta no total e no ticket médio com R$ 0,00, como no relatório; a tela avisa quantas são e o Excel mostra quais.
+- **Valor**: aceita `R$ 1.234,56`, `645,15`, `1234.56`, `500` e célula numérica do Excel.
+- **Sem “Valor Total dos Débitos”** (vazio ou sem número), o valor é procurado no **Parecer De Campo** (`valorNoTexto` em `js/normalize.js`): vale o primeiro valor com `R$` na frente (`débito de R$ 1.500,00, entrada de R$ 150,00` → R$ 1.500,00); sem `R$`, o primeiro número com vírgula e dois centavos (`DEBITO NEGOCIADO 1.250,00` → R$ 1.250,00). A tela avisa quantas negociações tiveram o valor tirado do parecer, e o Excel mostra o parecer, o valor achado e a origem do valor de cada uma.
+- Negociação **sem valor** em nenhum dos dois conta no total e no ticket médio com R$ 0,00, como no relatório; a tela avisa quantas são e o Excel mostra quais.
 - Linhas: só as equipes que negociaram no período, da que mais negociou para a que menos; o **Total** fica na base.
 - Filtros: período, **Mês** (todos os meses entre o primeiro e o último dia com dado) e **Equipe**. Ao abrir, o período é o mês do dado mais recente (atalho *Mês*), como o filtro *Mes/Ano* do relatório.
 - **Negociação por mês** (embaixo da tabela): a mesma conta (total, valor, ticket médio) para cada mês com negociação, do mais recente para o mais antigo, com o total. Vale o filtro de equipe; o de período não.
-- **Excel**: aba *Negociação por equipe* (a tabela, com o total), aba *Negociação por mês*, aba *Negociações* (uma linha por atividade, com as colunas da planilha de Atividades, a resposta, o texto original do valor, o valor lido e o valor no Power BI) e aba *Filtros*.
+- **Excel**: aba *Negociação por equipe* (a tabela, com o total), aba *Negociação por mês*, aba *Negociações* (uma linha por atividade, com as colunas da planilha de Atividades, a resposta, o texto original do valor, o Parecer De Campo, o valor achado no parecer, a origem do valor, o valor lido e o valor no Power BI) e aba *Filtros*.
 
 ### Onde o painel difere do relatório
 
