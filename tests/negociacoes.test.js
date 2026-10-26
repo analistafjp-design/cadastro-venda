@@ -103,18 +103,9 @@ test('valor do Power BI: só os dígitos ÷ 100 e R$ 0,00 quando o texto tem let
   assert.equal(pbi(undefined, undefined), 0);
 });
 
-test('diferenças com o Power BI: lista as negociações lidas de outro jeito e diz por quê', async () => {
+test('igualPowerBI: as contas passam a usar a fórmula do relatório', async () => {
   const { lista } = await carregar();
-  const d = G.diferencasPowerBI(lista);
-  const porId = new Map(d.map((x) => [Number(x.a.id) - 80000000, x]));
-  assert.deepEqual(Array.from(porId.keys()).sort((a, b) => a - b), [4, 9, 12, 13]);
-  assert.deepEqual([porId.get(4).painel, porId.get(4).powerBI, porId.get(4).diferenca], [1000.5, 100.05, 900.45]);
-  assert.match(porId.get(4).motivo, /uma casa de centavos/);
-  assert.match(porId.get(9).motivo, /uma casa de centavos/);
-  assert.deepEqual([porId.get(12).painel, porId.get(12).powerBI], [238.23, 0]);
-  assert.match(porId.get(12).motivo, /não consegue ler o texto/);
-  assert.match(porId.get(13).motivo, /sem os centavos/);
-  // com igualPowerBI os números passam a ser os do relatório
+  assert.equal(G.porEquipe(G.filtrar(lista, OUT)).total.valor, 4235); // padrão: o valor como está escrito
   const R = CV.regras.negociacoes;
   R.igualPowerBI = true;
   try {
@@ -154,17 +145,17 @@ test('tela: Recurso, Total negociação, Valor negociado e Ticket médio, ordena
   assert.match(alvo.textContent, /1 negociação\(ões\) sem “Valor Total dos Débitos”/);
 });
 
-test('tela: embaixo, a negociação por mês e as diferenças com o Power BI (só na tela)', async () => {
+test('tela: embaixo, a negociação por mês (e mais nada)', async () => {
   instalar();
   const { lista } = await carregar();
   const out = G.filtrar(lista, OUT);
   const alvo = document.createElement('div');
   CV.ui.renderNegociacoes(alvo, {
-    tabela: G.porEquipe(out), meses: G.porMes(lista), diferencas: G.diferencasPowerBI(out), igualPowerBI: false,
+    tabela: G.porEquipe(out), meses: G.porMes(lista),
     ordemDe: (id, padrao) => Object.assign({}, padrao),
   });
   const secoes = alvo.porTag('section');
-  assert.deepEqual(secoes.map((s) => s.porTag('h2')[0].textContent), ['Negociação — venda e recadastro', 'Negociação por mês', 'Diferenças com o Power BI']);
+  assert.deepEqual(secoes.map((s) => s.porTag('h2')[0].textContent), ['Negociação — venda e recadastro', 'Negociação por mês']);
   const [cab, ...meses] = linhasDaTabela(secoes[1]);
   assert.deepEqual(cab, ['Mês', 'Total negociação', 'Valor negociado', 'Ticket médio']);
   assert.deepEqual(meses.map((l) => l.slice(0, 3)), [
@@ -173,9 +164,6 @@ test('tela: embaixo, a negociação por mês e as diferenças com o Power BI (s�
     [CV.tratativas.rotuloMes('2026-08'), '1', fmt.brl(238.23)],
     ['Total', '9', fmt.brl(4973.23)],
   ]);
-  assert.match(secoes[2].className, /so-tela/);
-  assert.equal(linhasDaTabela(secoes[2]).length, 3); // cabeçalho + as 2 de outubro (4 e 9)
-  assert.match(secoes[2].textContent, new RegExp('fica ' + fmt.brl(900.45 + 1111.05).replace(/[$.]/g, '\\$&') + ' maior'));
 });
 
 test('tela: período sem negociação mostra a tabela vazia, sem total', () => {

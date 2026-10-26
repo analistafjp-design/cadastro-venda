@@ -847,8 +847,6 @@
     CV.ui.renderNegociacoes(alvo, {
       tabela: CV.negociacoes.porEquipe(lista),
       meses: CV.negociacoes.porMes(CV.negociacoes.filtrar(estado.negociacoes, { equipe: estado.filtros.equipe })),
-      diferencas: CV.negociacoes.diferencasPowerBI(lista),
-      igualPowerBI: !!R.negociacoes.igualPowerBI,
       ordemDe,
     });
   }

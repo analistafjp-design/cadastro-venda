@@ -95,25 +95,6 @@
     return { linhas, total: Object.assign({ mes: null }, somar(lista)) };
   }
 
-  /**
-   * Negociações cujo valor o painel lê diferente do relatório do Power BI, com o motivo provável.
-   * [{ a, painel, powerBI, diferenca, motivo }] (diferenca = painel − Power BI)
-   */
-  function diferencasPowerBI(lista) {
-    const out = [];
-    for (const a of lista) {
-      const painel = a.valorDebitos === null || a.valorDebitos === undefined ? 0 : a.valorDebitos;
-      const pbi = valorPowerBI(a);
-      if (Math.abs(painel - pbi) < 0.005) continue;
-      let motivo = 'o texto do valor está num formato que o relatório lê de outro jeito';
-      if (pbi === 0) motivo = 'o relatório não consegue ler o texto (tem letras, espaço ou outro símbolo junto do número) e conta R$ 0,00';
-      else if (Math.abs(painel - pbi * 100) < 0.005) motivo = 'o valor veio sem os centavos e o relatório divide por 100';
-      else if (Math.abs(painel * 10 - pbi * 100) < 0.005) motivo = 'o valor veio com uma casa de centavos só e o relatório divide por 100';
-      out.push({ a, painel, powerBI: pbi, diferenca: Math.round((painel - pbi) * 100) / 100, motivo });
-    }
-    return out;
-  }
-
   /** Primeiro e último dia com negociação. */
   function limites(lista) {
     return lista.length ? { min: lista[0].data, max: lista[lista.length - 1].data } : { min: null, max: null };
@@ -133,6 +114,6 @@
     return out.reverse();
   }
 
-  CV.negociacoes = { ehNegociacao, preparar, filtrar, valorPowerBI, valorDe, somar, porEquipe, porMes, diferencasPowerBI, limites, mesesEntre };
+  CV.negociacoes = { ehNegociacao, preparar, filtrar, valorPowerBI, valorDe, somar, porEquipe, porMes, limites, mesesEntre };
   if (typeof module !== 'undefined' && module.exports) module.exports = CV.negociacoes;
 })(typeof window !== 'undefined' ? window : globalThis);
