@@ -60,9 +60,15 @@
      * do Power BI. Conta as atividades FINALIZADAS das equipes do escopo (só a equipe; a cidade não
      * filtra, como no relatório) em que "Negociou O Débito?" é uma das respostas abaixo (chave sem
      * acento). Valor = "Valor Total dos Débitos"; ticket médio = valor ÷ negociações.
+     *
+     * igualPowerBI: false (padrão) lê o valor como está escrito ("R$ 1.234,56 à vista" = 1.234,56;
+     * "500" = 500,00). true copia a fórmula do relatório (só os dígitos ÷ 100, ou R$ 0,00 se o texto
+     * tiver letras ou outro símbolo), para os números baterem com o Power BI. Nos dois casos a aba lista
+     * as negociações em que os dois jeitos dão valores diferentes.
      */
     negociacoes: {
       respostas: ['SIM'],
+      igualPowerBI: false,
     },
 
     /**

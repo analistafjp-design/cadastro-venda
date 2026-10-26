@@ -31,13 +31,33 @@
     return lista.filter((a) => (!o.de || a.data >= o.de) && (!o.ate || a.data <= o.ate) && (!eq || chaveEquipe(a.recurso) === eq));
   }
 
+  /**
+   * O valor como o relatório do Power BI o lê (medida "Negociação Valor"): tira "R$", os pontos, troca a
+   * vírgula por ponto e divide por 100; se sobrar algo que não é número (letras, espaço no meio...), vale 0.
+   * Na prática: só os dígitos ÷ 100, ou 0. Célula numérica do Excel vira texto antes ("1000,5"), como no Power Query.
+   */
+  function valorPowerBI(a) {
+    const bruto = a.valorDebitosTxt !== null && a.valorDebitosTxt !== undefined ? a.valorDebitosTxt
+      : typeof a.valorDebitos === 'number' ? String(a.valorDebitos).replace('.', ',') : '';
+    const t = String(bruto).replace(/^ +| +$/g, '').replace(/ {2,}/g, ' ').split('R$').join('').split('.').join('').split(',').join('.');
+    if (!/^[ \t\r\n]*[-+]?[\d.]*\d[\d.]*[ \t\r\n]*$/.test(t)) return 0;
+    const n = Number(t.replace(/[^\d-]/g, '')) / 100;
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  /** O valor que entra nas contas: o lido pelo painel ou, com regras.negociacoes.igualPowerBI, o do relatório. */
+  function valorDe(a) {
+    if (CV.regras.negociacoes.igualPowerBI) return valorPowerBI(a);
+    return a.valorDebitos === null || a.valorDebitos === undefined ? 0 : a.valorDebitos;
+  }
+
   /** Total, valor, ticket médio e quantas vieram sem valor (contam na quantidade, não no valor). */
   function somar(lista) {
     let valor = 0;
     let semValor = 0;
     for (const a of lista) {
       if (a.valorDebitos === null || a.valorDebitos === undefined) semValor++;
-      else valor += a.valorDebitos;
+      valor += valorDe(a);
     }
     valor = Math.round(valor * 100) / 100;
     return { total: lista.length, valor, ticket: lista.length ? valor / lista.length : 0, semValor };
@@ -59,6 +79,41 @@
     return { linhas, total: Object.assign({ recurso: 'Total' }, somar(lista)) };
   }
 
+  /**
+   * Uma linha por mês ('2026-10'), do mais novo para o mais antigo, e o total: as mesmas contas da tabela
+   * por equipe. { linhas: [{ mes, total, valor, ticket, semValor }], total }
+   */
+  function porMes(lista) {
+    const grupos = new Map();
+    for (const a of lista) {
+      const m = a.data.slice(0, 7);
+      if (!grupos.has(m)) grupos.set(m, []);
+      grupos.get(m).push(a);
+    }
+    const linhas = Array.from(grupos.entries()).map(([mes, itens]) => Object.assign({ mes }, somar(itens)));
+    linhas.sort((a, b) => (a.mes < b.mes ? 1 : -1));
+    return { linhas, total: Object.assign({ mes: null }, somar(lista)) };
+  }
+
+  /**
+   * Negociações cujo valor o painel lê diferente do relatório do Power BI, com o motivo provável.
+   * [{ a, painel, powerBI, diferenca, motivo }] (diferenca = painel − Power BI)
+   */
+  function diferencasPowerBI(lista) {
+    const out = [];
+    for (const a of lista) {
+      const painel = a.valorDebitos === null || a.valorDebitos === undefined ? 0 : a.valorDebitos;
+      const pbi = valorPowerBI(a);
+      if (Math.abs(painel - pbi) < 0.005) continue;
+      let motivo = 'o texto do valor está num formato que o relatório lê de outro jeito';
+      if (pbi === 0) motivo = 'o relatório não consegue ler o texto (tem letras, espaço ou outro símbolo junto do número) e conta R$ 0,00';
+      else if (Math.abs(painel - pbi * 100) < 0.005) motivo = 'o valor veio sem os centavos e o relatório divide por 100';
+      else if (Math.abs(painel * 10 - pbi * 100) < 0.005) motivo = 'o valor veio com uma casa de centavos só e o relatório divide por 100';
+      out.push({ a, painel, powerBI: pbi, diferenca: Math.round((painel - pbi) * 100) / 100, motivo });
+    }
+    return out;
+  }
+
   /** Primeiro e último dia com negociação. */
   function limites(lista) {
     return lista.length ? { min: lista[0].data, max: lista[lista.length - 1].data } : { min: null, max: null };
@@ -78,6 +133,6 @@
     return out.reverse();
   }
 
-  CV.negociacoes = { ehNegociacao, preparar, filtrar, somar, porEquipe, limites, mesesEntre };
+  CV.negociacoes = { ehNegociacao, preparar, filtrar, valorPowerBI, valorDe, somar, porEquipe, porMes, diferencasPowerBI, limites, mesesEntre };
   if (typeof module !== 'undefined' && module.exports) module.exports = CV.negociacoes;
 })(typeof window !== 'undefined' ? window : globalThis);

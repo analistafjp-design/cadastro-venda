@@ -275,11 +275,14 @@ Conferido contra os dados do próprio relatório (17,6 mil linhas): mês a mês,
 - **Valor**: aceita `R$ 1.234,56`, `645,15`, `1234.56`, `500` e célula numérica do Excel. Negociação **sem valor** (vazio ou sem número) conta no total e no ticket médio com R$ 0,00, como no relatório; a tela avisa quantas são e o Excel mostra quais.
 - Linhas: só as equipes que negociaram no período, da que mais negociou para a que menos; o **Total** fica na base.
 - Filtros: período, **Mês** (todos os meses entre o primeiro e o último dia com dado) e **Equipe**. Ao abrir, o período é o mês do dado mais recente (atalho *Mês*), como o filtro *Mes/Ano* do relatório.
-- **Excel**: aba *Negociação por equipe* (a tabela, com o total), aba *Negociações* (uma linha por atividade, com as colunas da planilha de Atividades, a resposta, o texto original do valor e o valor lido) e aba *Filtros*.
+- **Negociação por mês** (embaixo da tabela): a mesma conta (total, valor, ticket médio) para cada mês com negociação, do mais recente para o mais antigo, com o total. Vale o filtro de equipe; o de período não.
+- **Diferenças com o Power BI** (só na tela, não vai para o PDF): as negociações do período em que o valor lido pelo painel é diferente do valor da fórmula do relatório, com o texto original, os dois valores e o motivo.
+- **Excel**: aba *Negociação por equipe* (a tabela, com o total), aba *Negociação por mês*, aba *Negociações* (uma linha por atividade, com as colunas da planilha de Atividades, a resposta, o texto original do valor, o valor lido e o valor no Power BI) e aba *Filtros*.
 
 ### Onde o painel difere do relatório
 
-- O relatório lê o *Valor Total dos Débitos* tirando `R$` e os pontos, trocando a vírgula por ponto e dividindo por 100: a conta só fecha quando o valor vem escrito com os centavos (`1.234,56`). O painel lê o valor como está escrito: `500` é R$ 500,00 (e não R$ 5,00) e `1234.5` é R$ 1.234,50.
+- O relatório lê o *Valor Total dos Débitos* tirando `R$` e os pontos, trocando a vírgula por ponto e dividindo por 100 (na prática: só os dígitos ÷ 100); se sobrar algo que não é número (letras, como em `R$ 238,23 em 3x`, ou espaço no meio do número), conta **R$ 0,00**. A conta só fecha quando o valor vem só com o número e com os centavos (`1.234,56`). O painel lê o valor como está escrito: `500` é R$ 500,00 (e não R$ 5,00), `1234.5` é R$ 1.234,50 e `R$ 238,23 em 3x` é R$ 238,23. A quantidade de negociações é a mesma nos dois; só o valor muda, e só nessas linhas, que a aba lista.
+- `igualPowerBI: true` em `negociacoes` (`js/regras.js`) faz o painel usar a fórmula do relatório, para os números baterem com o Power BI. O padrão (`false`) lê o valor como está escrito.
 - O relatório esconde a equipe cujo valor negociado é zero (filtro *Negociação Valor > 0* do visual); o painel a mostra, com o valor zerado, para a negociação sem valor não sumir da conta.
 
 ## 7. Listas de novos alvos

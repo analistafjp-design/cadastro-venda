@@ -220,7 +220,9 @@ def linhas_negociacoes():
              RIOVENIN-004 2 (1000,5 numérico + uma sem valor = R$ 1.000,50, ticket R$ 500,25; tipo Venda);
              RIORECIN-034 1 (texto "1234.5", em Itaboraí: a cidade não filtra, como no relatório).
              Ficam de fora: ocorrência com "Sim", finalizada com "Não", equipe fora do escopo e resposta vazia.
-    Setembro: RIORECIN-004 1 (R$ 200,00).
+    Setembro: RIORECIN-004 1 (R$ 200,00); RIOVENIN-002 1 ("R$ 300", sem centavos: R$ 3,00 no Power BI).
+    Agosto: RIORECIN-007 1 ("R$ 238,23 em 3x": o Power BI não lê o texto e conta R$ 0,00).
+    Fórmula do Power BI (dígitos ÷ 100): a 4 (1000,5 numérico) vira R$ 100,05 e a 9 ("1234.5") R$ 123,45.
     """
     f, oc = "Finalizada", "Encerrada com Ocorrência"
     vc, venda = "Verificação Cadastral", "Venda Potenciais/Factíveis"
@@ -240,6 +242,8 @@ def linhas_negociacoes():
         r(9, "RIORECIN-034", 100000209, (10, 9), f, "SIM", "1234.5", cidade="ITABORAI"),
         r(10, "RIORECIN-004", 100000210, (9, 15), f, "SIM", "R$ 200,00"),
         r(11, "RIOVENIN-001", 100000211, (10, 10), f, None, "R$ 50,00"),
+        r(12, "RIORECIN-007", 100000212, (8, 20), f, "SIM", "R$ 238,23 em 3x"),
+        r(13, "RIOVENIN-002", 100000213, (9, 20), f, "SIM", "R$ 300"),
     ]
 
 

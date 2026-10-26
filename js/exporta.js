@@ -192,6 +192,21 @@
     };
   }
 
+  /** Negociações: a mesma conta mês a mês (do mais novo para o mais antigo), com o total na última linha. */
+  function abaNegociacoesMes(meses) {
+    return {
+      nome: 'Negociação por mês',
+      colunas: [
+        { titulo: 'Mês', valor: (l) => (l.mes ? CV.tratativas.rotuloMes(l.mes) : 'Total') },
+        { titulo: 'Total negociação', tipo: 'num', valor: (l) => l.total },
+        { titulo: 'Valor negociado (R$)', tipo: 'num', valor: (l) => l.valor },
+        { titulo: 'Ticket médio (R$)', tipo: 'num', valor: (l) => Math.round(l.ticket * 100) / 100 },
+        { titulo: 'Sem valor informado', tipo: 'num', valor: (l) => l.semValor || null },
+      ],
+      linhas: meses.linhas.length ? meses.linhas.concat([meses.total]) : [],
+    };
+  }
+
   /** Negociações: uma linha por atividade (colunas da planilha de Atividades), com a resposta e o valor. */
   function abaNegociacoes(lista) {
     const fora = ['Projeto (base)', 'Motivo de Não Execução - Normal', 'Quantidade De Economia'];
@@ -200,7 +215,8 @@
       colunas: colunasAtividade().filter((c) => !fora.includes(c.titulo)).concat([
         { titulo: 'Negociou O Débito?', valor: (a) => a.negociou },
         { titulo: 'Valor Total dos Débitos', valor: (a) => (a.valorDebitosTxt !== null && a.valorDebitosTxt !== undefined ? a.valorDebitosTxt : a.valorDebitos) },
-        { titulo: 'Valor negociado (R$)', tipo: 'num', valor: (a) => a.valorDebitos },
+        { titulo: 'Valor negociado (R$)', tipo: 'num', valor: (a) => CV.negociacoes.valorDe(a) },
+        { titulo: 'Valor no Power BI (R$)', tipo: 'num', valor: (a) => CV.negociacoes.valorPowerBI(a) },
       ]),
       linhas: lista,
     };
@@ -215,6 +231,6 @@
     };
   }
 
-  CV.exporta = { colunasAtividade, colunasCruzamento, abaVisitas, abaAgenda, abaDias, abaTratativas, abaQuadros, abaMeses, abaNegociacoesEquipe, abaNegociacoes, abaFiltros, rotulosDeResultado };
+  CV.exporta = { colunasAtividade, colunasCruzamento, abaVisitas, abaAgenda, abaDias, abaTratativas, abaQuadros, abaMeses, abaNegociacoesEquipe, abaNegociacoesMes, abaNegociacoes, abaFiltros, rotulosDeResultado };
   if (typeof module !== 'undefined' && module.exports) module.exports = CV.exporta;
 })(typeof window !== 'undefined' ? window : globalThis);
