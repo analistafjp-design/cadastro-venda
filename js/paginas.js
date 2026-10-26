@@ -27,6 +27,7 @@
       escopo: null, // vale o de regras.js
       soEscopo: false, // guarda também as visitas de outras equipes (servem para ligar o retorno pela matrícula)
       tratativas: true, // tem a aba Tratativas (lê DE/PARA e ANTERIOR/ATUAL do formulário de Resultados)
+      negociacoes: true, // tem a aba Negociações (lê "Negociou O Débito?" e "Valor Total dos Débitos" das Atividades)
       herdaPastaDe: null,
       prefixoArquivo: '',
       /**
@@ -46,6 +47,7 @@
       escopo: { equipes: ['RIOVCGVENIN-001', 'RIOVCGVENIN-002', 'RIOVCGVENIN-004'], cidades: [] },
       soEscopo: true,
       tratativas: false, // o formulário Resultados VCG não tem DE/PARA nem ANTERIOR/ATUAL
+      negociacoes: false, // a tabela de negociação do relatório é das equipes do interior
       herdaPastaDe: 'cadastro-venda', // aproveita a pasta já escolhida na página do interior
       prefixoArquivo: 'vcg_',
       recusa(caminho, tipo) {

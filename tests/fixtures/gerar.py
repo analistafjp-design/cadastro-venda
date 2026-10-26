@@ -207,6 +207,42 @@ def linhas_resultados_vcg():
     ]
 
 
+CAB_NEG = [
+    "Recurso", "ID da Atividade", "Matrícula", "Data", "Status da Atividade", "Tipo de Atividade", "Cidade", "Bairro",
+    "Observação", "Negociou O Débito?", "Forma De Negociação", "Valor Total dos Débitos",
+]
+
+
+def linhas_negociacoes():
+    """Atividades com negociação de débito (aba Negociações; tests/negociacoes.test.js, valores conferidos à mão).
+
+    Outubro: RIORECIN-013 3 negociações (R$ 1.234,56 + 645,15 + 120,29 = R$ 2.000,00; "Sim " e "sim" também valem);
+             RIOVENIN-004 2 (1000,5 numérico + uma sem valor = R$ 1.000,50, ticket R$ 500,25; tipo Venda);
+             RIORECIN-034 1 (texto "1234.5", em Itaboraí: a cidade não filtra, como no relatório).
+             Ficam de fora: ocorrência com "Sim", finalizada com "Não", equipe fora do escopo e resposta vazia.
+    Setembro: RIORECIN-004 1 (R$ 200,00).
+    """
+    f, oc = "Finalizada", "Encerrada com Ocorrência"
+    vc, venda = "Verificação Cadastral", "Venda Potenciais/Factíveis"
+
+    def r(id_, rec, mat, dia, st, neg, valor, tipo=vc, cidade="MIRACEMA", forma="À vista"):
+        return [rec, 80000000 + id_, mat, D(2026, dia[0], dia[1]), st, tipo, cidade, "CENTRO", OBS_VIDA_NOVA, neg, forma if neg else None, valor]
+
+    return [
+        r(1, "RIORECIN-013", 100000201, (10, 1), f, "SIM", "R$ 1.234,56"),
+        r(2, "RIORECIN-013", 100000202, (10, 2), f, "Sim ", "645,15", forma="Parcelado"),
+        r(3, "RIORECIN-013", 100000203, (10, 3), f, "sim", "R$ 120,29"),
+        r(4, "RIOVENIN-004", 100000204, (10, 5), f, "SIM", 1000.5, tipo=venda),
+        r(5, "RIOVENIN-004", 100000205, (10, 6), f, "SIM", None, tipo=venda),
+        r(6, "RIORECIN-007", 100000206, (10, 7), oc, "SIM", "R$ 900,00"),
+        r(7, "RIORECIN-007", 100000207, (10, 7), f, "NÃO", "R$ 300,00"),
+        r(8, "RIOCORTE-001", 100000208, (10, 8), f, "SIM", "R$ 5.000,00"),
+        r(9, "RIORECIN-034", 100000209, (10, 9), f, "SIM", "1234.5", cidade="ITABORAI"),
+        r(10, "RIORECIN-004", 100000210, (9, 15), f, "SIM", "R$ 200,00"),
+        r(11, "RIOVENIN-001", 100000211, (10, 10), f, None, "R$ 50,00"),
+    ]
+
+
 def planilha(caminho, aba, cab, linhas, topo=0):
     wb = Workbook()
     ws = wb.active
@@ -291,4 +327,7 @@ if __name__ == "__main__":
     planilha(os.path.join(AQUI, "atividades_vcg.xlsx"), "Cadastral", CAB_ATIV, linhas_atividades_vcg())
     planilha(os.path.join(AQUI, "atividades_cabecalho_na_linha_3.xlsx"), "Cadastral", CAB_ATIV, linhas_atividades()[:3], topo=2)
     export_estilo_sistema(os.path.join(AQUI, "atividades_export_sistema.xlsx"))
+    # aba Negociações: atividades da exportação completa com "Negociou O Débito?" e "Valor Total dos Débitos"
+    planilha(os.path.join(AQUI, "atividades_negociacoes.xlsx"), "Cadastral", CAB_NEG, linhas_negociacoes())
+    planilha(os.path.join(EXEMPLOS, "exemplo-negociacoes.xlsx"), "Cadastral", CAB_NEG, linhas_negociacoes())
     print("fixtures geradas em", AQUI)

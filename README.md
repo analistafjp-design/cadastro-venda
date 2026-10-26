@@ -48,7 +48,7 @@ O botão **Painel VCG** (no topo do Interior) abre a página do VCG, e **Painel 
 
 ## O que o painel mostra
 
-Cinco abas (a de Tratativas só no Interior), no estilo do painel de Pós-Corte (cards, tabelas limpas, claro/escuro). Os filtros do topo (data inicial/final, cidade, equipe, base) e os atalhos *Último dia · 7 dias · 30 dias · Mês · Tudo* valem para a aba aberta. **Ao abrir o painel, o período já vem em *Mês***: do dia 1º do mês do dado mais recente até o último dia com dado (os outros atalhos continuam à mão).
+Seis abas (Tratativas e Negociações só no Interior), no estilo do painel de Pós-Corte (cards, tabelas limpas, claro/escuro). Os filtros do topo (data inicial/final, cidade, equipe, base) e os atalhos *Último dia · 7 dias · 30 dias · Mês · Tudo* valem para a aba aberta. **Ao abrir o painel, o período já vem em *Mês***: do dia 1º do mês do dado mais recente até o último dia com dado (os outros atalhos continuam à mão).
 
 - **Visão geral** — o que importa para decidir, sem um monte de números:
   - **Efetividade** em destaque no topo (das visitas executadas, quantas geraram resultado) e, ao lado, *Percorrido* (= Exec + Exoc), *Exec*, *Exoc* e *Com resultados*;
@@ -57,6 +57,7 @@ Cinco abas (a de Tratativas só no Interior), no estilo do painel de Pós-Corte 
   - **Resultado por equipe**: só as equipes que trouxeram resultado no período (resultado maior que zero). O **+** sob o nome abre os serviços que trouxeram resultado e a quantidade;
   - **Por data**: dia, semana ou mês. Datas recentes aparecem como *em maturação* (o backoffice ainda está lançando).
 - **Tratativas** — o que o backoffice incrementou e decrementou, **em R$** (a página *TRATATIVAS* do relatório do Power BI, agora no painel). Lê só a planilha de Resultados (não precisa das atividades): **Incremento de economia**, **Decremento de economia**, **Incremento de categoria** e **Decremento de categoria** (De/Para ou Anterior/Atual, quantidade e valor com uma barra proporcional, e o total de cada quadro na base; incrementos à esquerda, decrementos à direita), uma faixa de resumo com o **saldo** do período, os incrementos e decrementos e os números de tratativas (acumulado, dias e média por dia), o **saldo por mês** (com o **faturado no ano**: o saldo do mês × os meses que faltam até dezembro; a última linha é o **Total** de cada coluna) e a **conferência** dos dados (o que está inconsistente no formulário; fica só na tela, não vai para o PDF). Filtros: período, **Mês** e **Assistente**. As tarifas e as regras ficam em `js/regras.js` (`tratativas`) e batem com o relatório ao centavo, salvo as poucas exceções listadas (linhas repetidas, por exemplo) em [`docs/REGRAS.md`](docs/REGRAS.md) § 6.4. Experimente com `exemplos/exemplo-tratativas.xlsx`.
+- **Negociações** — a tabela *Negociação - venda e recadastro* do relatório do Power BI: por equipe, o **Total de negociações**, o **Valor negociado** e o **Ticket médio** (valor ÷ negociações), da que mais negociou para a que menos, com o **Total** na base. Lê só as planilhas de **Atividades** (a exportação completa do sistema, a mesma da pasta *Cadastro e Venda*): conta as atividades **Finalizadas** das 10 equipes com *Negociou O Débito?* = **Sim** e soma o *Valor Total dos Débitos*. Filtros: período, **Mês** e **Equipe** (ao abrir, o mês do dado mais recente). O **Exportar Excel** traz a tabela e uma linha por negociação. Experimente com `exemplos/exemplo-negociacoes.xlsx`.
 - **Tempos das equipes** — das equipes que trouxeram resultado no período: **deslocamento**, **serviço**, **pausas e apoio** (refeição, DDS, checklist...) e **ociosidade**, em horas:minutos, com a média por dia trabalhado (ou o total do período) e uma barra de como o dia foi usado, com o percentual escrito em cada trecho.
 - **Novos alvos** — listas de ação exportáveis em Excel:
   - *Revisitar*: última visita parou em cliente ausente / retornar depois / imóvel fechado, ordenadas pela **chance estimada** (taxa histórica do projeto × nº de economias);
@@ -97,7 +98,7 @@ O app é um site estático, sem build. No GitHub: *Settings → Pages → Deploy
 ## Desenvolvimento
 
 ```bash
-npm test                         # 151 testes (Node 18+; sem dependências)
+npm test                         # 161 testes (Node 18+; sem dependências)
 python3 tests/fixtures/gerar.py  # regenera as planilhas sintéticas (requer openpyxl)
 ```
 
@@ -117,6 +118,7 @@ js/
   paginas.js          as duas páginas (Interior e VCG): equipes, banco e quais arquivos cada uma lê
   tempos.js           deslocamento, serviço, apoio e ociosidade por equipe/dia
   tratativas.js       incremento/decremento de economia e categoria em R$ (aba Tratativas)
+  negociacoes.js      débitos negociados por equipe: quantidade, valor e ticket médio (aba Negociações)
   dados.js            colunas, limpeza e derivação
   cruzamento.js       atribuição retorno → visita (matrícula + janela)
   metricas.js         agregações e listas de novos alvos
@@ -124,7 +126,7 @@ js/
   store.js            armazenamento local (dados e pasta lembrada)
   xlsx-escrita.js     gerador de .xlsx próprio (sem bibliotecas)
   exporta.js          colunas da exportação analítica (formato Atividades)
-  ui-util.js ui-tabela.js ui-visao.js ui-tratativas.js app.js   interface (ui-visao: cards, equipes, tempos; ui-tratativas: aba Tratativas)
+  ui-util.js ui-tabela.js ui-visao.js ui-tratativas.js ui-negociacoes.js app.js   interface (ui-visao: cards, equipes, tempos; ui-tratativas e ui-negociacoes: as abas de mesmo nome)
 tests/                testes automatizados + planilhas sintéticas
 exemplos/             planilhas sintéticas para experimentar
 ```

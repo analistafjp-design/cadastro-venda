@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 const RAIZ = path.join(__dirname, '..', 'js');
-['normalize', 'regras', 'zip', 'xlsx', 'projetos', 'resultados', 'escopo', 'paginas', 'tempos', 'dados', 'cruzamento', 'metricas', 'tratativas', 'pasta', 'xlsx-escrita', 'exporta', 'ui-util', 'ui-tabela', 'ui-visao', 'ui-tratativas'].forEach((m) =>
+['normalize', 'regras', 'zip', 'xlsx', 'projetos', 'resultados', 'escopo', 'paginas', 'tempos', 'dados', 'cruzamento', 'metricas', 'tratativas', 'negociacoes', 'pasta', 'xlsx-escrita', 'exporta', 'ui-util', 'ui-tabela', 'ui-visao', 'ui-tratativas', 'ui-negociacoes'].forEach((m) =>
   require(path.join(RAIZ, m + '.js'))
 );
 

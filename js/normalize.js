@@ -130,6 +130,25 @@
     return Number(m[1]) * 60 + min + (m[3] && Number(m[3]) >= 30 ? 1 : 0);
   }
 
+  /**
+   * Valor em reais escrito de qualquer jeito -> número (ou null se não houver número).
+   * 'R$ 1.234,56' -> 1234.56 ; '645,15' -> 645.15 ; '1234.56' -> 1234.56 ; '1.500' -> 1500 ;
+   * '500' -> 500 ; célula numérica do Excel -> ela mesma ; 'não informado' -> null.
+   * Com vírgula, ela é a dos centavos (pt-BR); sem vírgula, o ponto só é de centavos se tiver 1 ou 2 casas depois.
+   */
+  function valorReais(v) {
+    if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+    const t = texto(v);
+    if (t === null) return null;
+    const m = /-?\d[\d.,]*/.exec(t.replace(/\s+/g, ''));
+    if (!m) return null;
+    let s = m[0].replace(/[.,]+$/, '');
+    if (s.includes(',')) s = s.replace(/\./g, '').replace(/,(?=.*,)/g, '').replace(',', '.');
+    else if (!/^-?\d+\.\d{1,2}$/.test(s)) s = s.replace(/\./g, '');
+    const n = Number(s);
+    return Number.isFinite(n) ? n : null;
+  }
+
   /** minutos -> 'H:MM' (ex.: 481 -> '8:01'); null -> '–'. */
   function hhmm(min) {
     if (min === null || min === undefined || !Number.isFinite(min)) return '–';
@@ -191,7 +210,7 @@
 
   CV.normalize = {
     semAcento, chave, chaveCabecalho, texto, matricula, protocolo, data, serialParaIso,
-    diasEntre, somaDias, dataBR, inicioSemana, diaDaSemana, similaridade, p2, minutos, hhmm,
+    diasEntre, somaDias, dataBR, inicioSemana, diaDaSemana, similaridade, p2, minutos, hhmm, valorReais,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = CV.normalize;
 })(typeof window !== 'undefined' ? window : globalThis);
