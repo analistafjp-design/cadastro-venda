@@ -100,7 +100,7 @@
         { nome: 'Residencial', contem: ['RES'] },
         { nome: 'Social', contem: ['SOC'] },
         { nome: 'Industrial', contem: ['IND'] },
-        { nome: 'Pública', contem: ['PUB'] },
+        { nome: 'Pública', contem: ['PUB', 'LUCRAT'] }, // "Sem fins lucrativos" ("SEM FINS LUCRATIVOS", "ENT.S/FIM LUCRATIVO"...) é Pública
         { nome: 'Comércio popular', contem: ['POPULAR'], soCorrigido: true },
         { nome: 'P. Comércio', contem: ['P COM', 'PCOM'] },
         { nome: 'Comercial', contem: ['COM'] },
@@ -112,15 +112,13 @@
        * nenhuma categoria (nem destas) aparece como foi escrito, e "Outros" só sobra para campo vazio.
        */
       outrasCategorias: [
-        { nome: 'Sem fins lucrativos', contem: ['LUCRAT'] }, // "SEM FINS LUCRATIVOS", "ENT.S/FIM LUCRATIVO", "ENTIDADE SEM FINS LUCRATIVOS"
         { nome: 'CadÚnico', contem: ['CADUNICO'] },
       ],
       /**
-       * true = os números batem com os do relatório do Power BI, inclusive dois detalhes dele que
-       * parecem erro: (1) nos quadros de CATEGORIA a "Pública" vale zero (o relatório procura
-       * "Publica", sem acento, na tabela de tarifas, que tem "PÚBLICA"); (2) "Comércio popular"
-       * é contado como "Comercial" (443,57). A aba avisa quantos lançamentos são afetados.
-       * false = corrige os dois: Pública vale 129,16 e Comércio popular tem a tarifa própria (60,24).
+       * true = copia um detalhe do relatório do Power BI que parece erro: "Comércio popular" é contado como
+       * "Comercial" (443,57). A aba avisa quantos lançamentos são afetados. false = Comércio popular tem a
+       * tarifa própria (60,24). (O relatório também deixa a Pública valendo zero nos quadros de CATEGORIA, por
+       * causa do acento; isso não é copiado: a Pública vale 129,16 em todos os quadros.)
        */
       igualPowerBI: true,
       /**

@@ -22,10 +22,9 @@
   const N = () => CV.normalize;
 
   const OUTROS = 'Outros';
-  const PUBLICA = 'Pública';
   const EXEMPLOS = 5;
 
-  /** Os números batem com os do relatório do Power BI (inclusive os dois detalhes de regras.igualPowerBI)? */
+  /** Os números batem com os do relatório do Power BI (inclusive o detalhe de regras.igualPowerBI)? */
   const igualPowerBI = () => CV.regras.tratativas.igualPowerBI !== false;
 
   /** Na ordem em que aparecem na tela: economia à esquerda, categoria à direita (2 × 2). */
@@ -58,7 +57,7 @@
 
   /**
    * Nome da categoria nos quadros de CATEGORIA (campos ANTERIOR e ATUAL): a categoria com tarifa; senão uma de
-   * `outrasCategorias` ("Sem fins lucrativos", "CadÚnico"); senão o próprio texto, como foi escrito. "Outros" só
+   * `outrasCategorias` ("CadÚnico"); senão o próprio texto, como foi escrito. "Outros" só
    * para campo vazio. É só o nome: a tarifa de quem não está em `tarifas` continua zero.
    */
   function nomeCategoria(txt) {
@@ -75,8 +74,6 @@
   const temTarifa = (cat) => typeof CV.regras.tratativas.tarifas[cat] === 'number';
   /** Tarifa em centavos por economia; sem tarifa (ex.: "Outros") = 0, como o Power BI (valor em branco). */
   const centavosDe = (cat) => (temTarifa(cat) ? Math.round(CV.regras.tratativas.tarifas[cat] * 100) : 0);
-  /** Nos quadros de categoria o relatório não acha a tarifa da Pública (acento): vale zero. */
-  const centavosCategoria = (cat) => (igualPowerBI() && cat === PUBLICA ? 0 : centavosDe(cat));
 
   /** "2 Residências" -> 2; sem número no começo -> null. */
   function numeroInicial(txt) {
@@ -231,7 +228,7 @@
     }
     const c = l.cat;
     if (c && c.qtd > 0) {
-      const centavos = c.qtd * (centavosCategoria(c.atual) - centavosCategoria(c.anterior));
+      const centavos = c.qtd * (centavosDe(c.atual) - centavosDe(c.anterior));
       if (centavos !== 0) out.push({ quadro: centavos > 0 ? 'incCat' : 'decCat', frente: l.frente, de: c.anterior, para: c.atual, n: c.qtd, centavos });
     }
     return out;
@@ -245,9 +242,8 @@
     rotuloIncMenor: 'Marcado como Incremento, mas PARA é menor que DE: entra no decremento',
     rotuloDecMaior: 'Marcado como Decremento, mas PARA é maior que DE: fica de fora',
     mistas: 'DE e PARA de categorias diferentes: valor pela regra do relatório',
-    semTarifa: 'Categoria sem tarifa (ex.: sem fins lucrativos, CadÚnico): valor calculado com tarifa zero',
+    semTarifa: 'Categoria sem tarifa (ex.: CadÚnico): valor calculado com tarifa zero',
     semQuantidade: 'Categoria alterada sem QUANTIDADE: fica de fora (valor zero)',
-    publicaZero: 'Categoria Pública valendo zero, igual ao Power BI (o relatório não acha a tarifa por causa do acento)',
     popular: 'Comércio popular contado como Comercial, igual ao Power BI',
   };
 
@@ -257,7 +253,6 @@
   function sinais(l, evs) {
     const s = [];
     const e = l.eco;
-    const doPowerBI = igualPowerBI();
     if (l.ecoIlegivel) s.push('ecoIlegivel');
     if (l.ecoCats && evs.length) s.push('porCategoria');
     if (evs.some((v) => v.quadro.endsWith('Eco') && Math.abs(v.n) >= CV.regras.tratativas.variacaoSuspeita)) s.push('variacaoGrande');
@@ -266,8 +261,7 @@
     if (evs.some((v) => v.quadro.endsWith('Eco') && v.de !== v.para)) s.push('mistas');
     if (evs.some((v) => !temTarifa(v.de) || !temTarifa(v.para))) s.push('semTarifa');
     if (l.cat && l.cat.anterior !== l.cat.atual && !(l.cat.qtd > 0)) s.push('semQuantidade');
-    if (doPowerBI && evs.some((v) => v.quadro.endsWith('Cat') && (v.de === PUBLICA || v.para === PUBLICA))) s.push('publicaZero');
-    if (doPowerBI && l.popular && evs.length) s.push('popular');
+    if (igualPowerBI() && l.popular && evs.length) s.push('popular');
     return s;
   }
 
