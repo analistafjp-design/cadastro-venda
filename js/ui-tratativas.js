@@ -124,8 +124,8 @@
     const b = ui.bloco('Conferência dos dados', 'Pontos de atenção nos lançamentos do período. A coluna “Observação” do Excel exportado mostra, linha a linha, onde cada um aparece.');
     b.className += ' so-tela'; // é para quem confere os dados na tela: não vai para o PDF
     b.appendChild(h('ul', { class: 'lista-simples' }, itens.map((t) => h('li', { text: t }))));
-    if (conf.publicaZero > 0 || conf.popular > 0) {
-      b.appendChild(h('p', { class: 'nota', text: 'Os números batem com os do relatório do Power BI, inclusive nos dois itens acima sobre Pública e Comércio popular. Para corrigi-los, use igualPowerBI: false em tratativas, no arquivo js/regras.js.' }));
+    if (conf.popular > 0) {
+      b.appendChild(h('p', { class: 'nota', text: 'Os números batem com os do relatório do Power BI, inclusive no item acima sobre Comércio popular. Para corrigi-lo, use igualPowerBI: false em tratativas, no arquivo js/regras.js.' }));
     }
     return b;
   }

@@ -877,7 +877,7 @@
       ['Assistente', f.assistente || 'Todos'],
       ['Frente de serviço', R.tratativas.frente || 'Todas'],
       ['Tarifas (R$ por economia)', Object.entries(R.tratativas.tarifas).map(([c, t]) => c + ' ' + fmt.dec2(t)).join(' · ')],
-      ['Igual ao Power BI', R.tratativas.igualPowerBI === false ? 'Não (Pública e Comércio popular corrigidos)' : 'Sim'],
+      ['Igual ao Power BI', R.tratativas.igualPowerBI === false ? 'Não (Comércio popular corrigido)' : 'Sim'],
     ];
     return baixarExcel('tratativas_' + periodoTxt(), [
       CV.exporta.abaQuadros(CV.tratativas.analisar(linhas)),

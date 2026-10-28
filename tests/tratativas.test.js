@@ -57,7 +57,7 @@ test('categoria do texto livre: a ordem do Power BI, "Outros" e o comércio popu
   const casos = [
     ['2 Comércios', 'Comercial'], ['1 Comercial', 'Comercial'], ['1 Residência', 'Residencial'], ['3 Residências', 'Residencial'],
     ['Social', 'Social'], ['Industrial', 'Industrial'], ['3 Publica', 'Pública'], ['P. Comercio', 'P. Comércio'], ['P.COMERCIO', 'P. Comércio'],
-    ['SEM FINS LUCRATIVOS', 'Outros'], ['ENT.S/FIM LUCRATIVO', 'Outros'], ['BAIRRO LEGAL', 'Outros'], ['CADÚNICO', 'Outros'],
+    ['SEM FINS LUCRATIVOS', 'Pública'], ['ENT.S/FIM LUCRATIVO', 'Pública'], ['BAIRRO LEGAL', 'Outros'], ['CADÚNICO', 'Outros'],
     ['DE 1 RES. SOCIAL P/ 2 RES. NORMAIs', 'Residencial'], // RES vem antes de SOC, como no relatório
     ['COMÉRCIO POPULAR', 'Comercial'], ['COM. POPULAR', 'Comercial'], // igual ao Power BI
     ['', 'Outros'], [null, 'Outros'], [undefined, 'Outros'],
@@ -188,20 +188,20 @@ test('Setembro: incremento e decremento de categoria (quantidade × diferença d
   const a = T.analisar(T.filtrar(linhas, SET));
   const inc = a.quadros.incCat;
   const i = por(inc);
-  assert.equal(inc.linhas.length, 3);
+  assert.equal(inc.linhas.length, 4);
   assert.deepEqual([i.get('Social>Residencial').n, i.get('Social>Residencial').valor], [14, 774.06]); // 14 × (85,41 − 30,12)
+  assert.deepEqual([i.get('Residencial>Pública').n, i.get('Residencial>Pública').valor], [1, 43.75]); // "SEM FINS LUCRATIVOS" é Pública: 129,16 − 85,41
   assert.deepEqual([i.get('P. Comércio>Comercial').n, i.get('P. Comércio>Comercial').valor], [8, 1774.32]); // 7 + 1 (o "comércio popular" é Comercial no relatório)
   assert.deepEqual([i.get('Comercial>Industrial').n, i.get('Comercial>Industrial').valor], [2, 339.2]); // 2 × (613,17 − 443,57)
-  assert.deepEqual([inc.n, inc.valor], [24, 2887.58]);
+  assert.deepEqual([inc.n, inc.valor], [25, 2931.33]);
 
   const dec = a.quadros.decCat;
   const d = por(dec);
-  assert.equal(dec.linhas.length, 4);
+  assert.equal(dec.linhas.length, 3);
   assert.deepEqual([d.get('Residencial>Social').n, d.get('Residencial>Social').valor], [31, -1713.99]);
   assert.deepEqual([d.get('Comercial>P. Comércio').n, d.get('Comercial>P. Comércio').valor], [8, -1774.32]);
-  assert.deepEqual([d.get('Residencial>Sem fins lucrativos').n, d.get('Residencial>Sem fins lucrativos').valor], [1, -85.41]); // sem tarifa: vale zero (o nome certo, não "Outros")
-  assert.deepEqual([d.get('Comercial>Pública').n, d.get('Comercial>Pública').valor], [1, -443.57]); // Pública vale zero nos quadros de categoria (como no relatório)
-  assert.deepEqual([dec.n, dec.valor], [41, -4017.29]);
+  assert.deepEqual([d.get('Comercial>Pública').n, d.get('Comercial>Pública').valor], [1, -314.41]); // 129,16 − 443,57 (o relatório deixa a Pública valendo zero aqui; o painel não)
+  assert.deepEqual([dec.n, dec.valor], [40, -3802.72]);
   // a mudança sem QUANTIDADE (id 19) e a de outra frente (id 22) não aparecem
   assert.equal(i.has('Social>Comercial') || d.has('Social>Comercial'), false);
   assert.equal(i.has('Social>Residencial') && i.get('Social>Residencial').n, 14);
@@ -210,7 +210,7 @@ test('Setembro: incremento e decremento de categoria (quantidade × diferença d
 test('saldo é a soma dos quatro quadros e os cards contam as tratativas e os dias', async () => {
   const { linhas } = await carregar();
   const a = T.analisar(T.filtrar(linhas, SET));
-  assert.equal(a.saldo, -157.16); // 1314,19 − 341,64 + 2887,58 − 4017,29
+  assert.equal(a.saldo, 101.16); // 1314,19 − 341,64 + 2931,33 − 3802,72
   const soma = Object.values(a.quadros).reduce((s, q) => s + Math.round(q.valor * 100), 0);
   assert.equal(soma / 100, a.saldo);
   // tratados: ids 1, 13, 23 (dia 1), 15 (dia 2), 26 (dia 3) e 32 (concluído no dia 4); "sem tratativa", ";" e vazios não contam
@@ -228,9 +228,8 @@ test('conferência: o que o Power BI faz de diferente ou que merece olhar', asyn
     rotuloIncMenor: 1, // id 6
     rotuloDecMaior: 1, // id 7
     mistas: 2, // ids 9 e 10
-    semTarifa: 1, // id 18 (para "Sem fins lucrativos")
+    semTarifa: 0, // o id 18 (para "Sem fins lucrativos") é Pública
     semQuantidade: 1, // id 19
-    publicaZero: 1, // id 21
     popular: 1, // id 20
   });
 });
@@ -241,8 +240,8 @@ test('filtros: assistente e período', async () => {
   assert.equal(bia.quadros.incEco.valor, 256.23);
   assert.equal(bia.quadros.decEco.valor, 187.34); // −170,82 + 358,16
   assert.equal(bia.quadros.incCat.valor, 0);
-  assert.equal(bia.quadros.decCat.valor, -3931.88);
-  assert.equal(bia.saldo, -3488.31);
+  assert.equal(bia.quadros.decCat.valor, -3802.72);
+  assert.equal(bia.saldo, -3359.15);
 
   const dia1 = T.analisar(T.filtrar(linhas, { de: '2026-09-01', ate: '2026-09-01' }));
   assert.equal(dia1.quadros.incEco.valor, 614.39); // ids 1 e 2
@@ -263,13 +262,13 @@ test('saldo por mês: do mais novo ao mais antigo, com o faturado no ano; o per�
   const [out, set] = m;
   assert.deepEqual([out.incEco, out.incCat, out.decEco, out.decCat, out.saldo], [85.41, 0, 0, -110.58, -25.17]);
   assert.deepEqual([out.mesesAteDezembro, out.anual], [2, -50.34]); // outubro: −25,17 × 2 (novembro e dezembro)
-  assert.equal(set.saldo, -157.16);
-  assert.deepEqual([set.mesesAteDezembro, set.anual], [3, -471.48]); // setembro: −157,16 × 3
+  assert.equal(set.saldo, 101.16);
+  assert.deepEqual([set.mesesAteDezembro, set.anual], [3, 303.48]); // setembro: 101,16 × 3
   assert.equal('variacao' in out, false); // o comparativo com o mês anterior saiu
   assert.equal(set.lancamentos, 16);
   const bia = T.porMes(linhas, { assistente: 'Bia' });
   assert.equal(bia[0].saldo, -110.58);
-  assert.equal(bia[1].saldo, -3488.31);
+  assert.equal(bia[1].saldo, -3359.15);
   assert.equal(T.rotuloMes('2026-01'), 'JAN/2026');
 });
 
@@ -279,17 +278,16 @@ test('opções dos filtros: assistentes, meses e limites das datas (só a frente
   assert.deepEqual(T.opcoes([]), { assistentes: [], meses: [], min: null, max: null });
 });
 
-test('igualPowerBI: false corrige Pública e Comércio popular (e os avisos somem)', async () => {
+test('igualPowerBI: false corrige o Comércio popular (e o aviso some)', async () => {
   const { lr } = await carregar();
   comRegra({ igualPowerBI: false }, () => {
     const a = T.analisar(T.filtrar(T.preparar(lr.limpas), SET));
     const dec = por(a.quadros.decCat);
     assert.equal(dec.get('Comercial>Pública').valor, -314.41); // 129,16 − 443,57
     assert.equal(dec.get('P. Comércio>Comércio popular').valor, -161.54); // 60,24 − 221,78: agora é decremento
-    assert.equal(a.quadros.incCat.valor, 2665.79); // sem os 221,79 que o relatório contava como incremento
-    assert.equal(a.quadros.decCat.valor, -4049.67);
-    assert.equal(a.saldo, -411.33);
-    assert.equal(a.conferencia.publicaZero, 0);
+    assert.equal(a.quadros.incCat.valor, 2709.54); // sem os 221,79 que o relatório contava como incremento
+    assert.equal(a.quadros.decCat.valor, -3964.26);
+    assert.equal(a.saldo, -282.17);
     assert.equal(a.conferencia.popular, 0);
   });
 });
@@ -300,15 +298,15 @@ test('a frente de serviço é uma regra: vazia, entram todas', async () => {
     const a = T.analisar(T.filtrar(T.preparar(lr.limpas), SET));
     assert.equal(a.conferencia.foraFrente, 0);
     assert.equal(a.quadros.decEco.n, -6); // + id 11 (Bairro Legal): 2 Res→1 Res
-    assert.equal(a.quadros.incCat.valor, 3164.03); // + id 22: 5 × (85,41 − 30,12)
-    assert.equal(a.saldo, 33.88); // −157,16 − 85,41 + 276,45
+    assert.equal(a.quadros.incCat.valor, 3207.78); // + id 22: 5 × (85,41 − 30,12)
+    assert.equal(a.saldo, 292.2); // 101,16 − 85,41 + 276,45
   });
 });
 
 test('detalhe (Excel): um evento por linha, com o quadro, o valor e a observação', async () => {
   const { linhas } = await carregar();
   const det = T.detalhe(T.filtrar(linhas, SET));
-  assert.equal(det.length, 18); // 4 + 4 de economia, 4 + 4 de categoria, e 2 que ficaram de fora (ids 7 e 19) para serem corrigidas
+  assert.equal(det.length, 18); // 4 + 4 de economia, 5 + 3 de categoria, e 2 que ficaram de fora (ids 7 e 19) para serem corrigidas
   const fora = det.filter((x) => x.quadro.titulo === '(fora dos quadros)');
   assert.deepEqual(fora.map((x) => x.l.id).sort(), ['19', '7']);
   assert.equal(fora[0].valor, null);
@@ -328,7 +326,7 @@ test('detalhe (Excel): um evento por linha, com o quadro, o valor e a observaç�
   assert.equal(val(id15, 'ANTERIOR'), 'P. Comercio');
   assert.equal(val(id15, 'Assistente'), 'Ana');
   const quadros = CV.exporta.abaQuadros(T.analisar(T.filtrar(linhas, SET)));
-  assert.deepEqual(quadros.linhas[quadros.linhas.length - 1], { quadro: 'Saldo do período', frente: null, a: null, b: null, n: null, valor: -157.16 });
+  assert.deepEqual(quadros.linhas[quadros.linhas.length - 1], { quadro: 'Saldo do período', frente: null, a: null, b: null, n: null, valor: 101.16 });
   // vira arquivo e volta
   const blob = await CV.xlsxw.gerar([aba, quadros, CV.exporta.abaMeses(T.porMes(linhas))]);
   const lido = await CV.xlsx.lerPlanilha(new Uint8Array(await blob.arrayBuffer()), { colunas: { quadro: ['Quadro'], valor: ['Valor (R$)'] } });
@@ -386,11 +384,12 @@ test('tela: os quatro quadros, sem a coluna da frente (uma só), com o total de 
 
   const ic = q('Incremento de categoria');
   assert.deepEqual(ic[0], ['Anterior', 'Atual', 'Total', 'Valor incremento']);
-  assert.deepEqual(ic[ic.length - 1], ['Total', '', '24', 'R$ 2.887,58']);
+  assert.deepEqual(ic[ic.length - 1], ['Total', '', '25', 'R$ 2.931,33']);
+  assert.ok(ic.some((l) => l.join('|') === 'Residencial|Pública|1|R$ 43,75')); // "SEM FINS LUCRATIVOS" é Pública: incremento
 
   const dc = q('Decremento de categoria');
   assert.deepEqual(dc[0], ['Anterior', 'Atual', 'Total', 'Valor decremento']);
-  assert.deepEqual(dc[dc.length - 1], ['Total', '', '41', '-R$ 4.017,29']);
+  assert.deepEqual(dc[dc.length - 1], ['Total', '', '40', '-R$ 3.802,72']);
   assert.ok(dc.some((l) => l.join('|') === 'Residencial|Social|31|-R$ 1.713,99'));
 });
 
@@ -432,11 +431,11 @@ test('tela: resumo do período (saldo, incrementos, decrementos), saldo por mês
   assert.match(txt, /Média por dia1,50/);
   // os quatro valores e o saldo (negativo, em vermelho)
   assert.match(txt, /Incremento de economiaR\$ 1\.314,19/);
-  assert.match(txt, /Decremento de categoria-R\$ 4\.017,29/);
+  assert.match(txt, /Decremento de categoria-R\$ 3\.802,72/);
   const resumo = alvo.achar((n) => /\bresumo\b/.test(n.className))[0];
   const saldo = resumo.achar((n) => /\br-saldo\b/.test(n.className))[0];
-  assert.ok(saldo.textContent.replace(/\u00a0/g, ' ').includes('-R$ 157,16'));
-  assert.ok(saldo.achar((n) => /\bneg\b/.test(n.className)).length > 0);
+  assert.ok(saldo.textContent.replace(/\u00a0/g, ' ').includes('R$ 101,16'));
+  assert.equal(saldo.achar((n) => /\bneg\b/.test(n.className)).length, 0);
   // incrementos à esquerda e decrementos à direita, como os quadros logo abaixo
   const grupos = resumo.achar((n) => /\br-grupo\b/.test(n.className));
   assert.deepEqual(grupos.map((g) => g.className), ['r-grupo inc', 'r-grupo dec']);
@@ -448,7 +447,7 @@ test('tela: resumo do período (saldo, incrementos, decrementos), saldo por mês
   const meses = textoTabela(secao(alvo, 'Saldo por mês'));
   assert.deepEqual(meses[0], ['Mês', 'Incremento de economia', 'Incremento de categoria', 'Decremento de economia', 'Decremento de categoria', 'Saldo', 'Faturado no ano']);
   assert.deepEqual(meses[1], ['OUT/2026', 'R$ 85,41', 'R$ 0,00', 'R$ 0,00', '-R$ 110,58', '-R$ 25,17', '-R$ 50,34']);
-  assert.deepEqual(meses[2], ['SET/2026', 'R$ 1.314,19', 'R$ 2.887,58', '-R$ 341,64', '-R$ 4.017,29', '-R$ 157,16', '-R$ 471,48']);
+  assert.deepEqual(meses[2], ['SET/2026', 'R$ 1.314,19', 'R$ 2.931,33', '-R$ 341,64', '-R$ 3.802,72', 'R$ 101,16', 'R$ 303,48']);
   assert.equal(alvo.textContent.includes('Vs. mês anterior'), false);
   assert.doesNotMatch(secao(alvo, 'Saldo por mês').textContent, /Exemplo: saldo de março/); // sem a legenda embaixo da tabela
   assert.equal(secao(alvo, 'Saldo por mês').porTag('p').filter((p) => /\bnota\b/.test(p.className)).length, 0);
@@ -459,7 +458,7 @@ test('tela: resumo do período (saldo, incrementos, decrementos), saldo por mês
   assert.ok(conf);
   assert.match(conf.textContent, /2 lançamento\(s\) de outra frente de serviço/);
   assert.match(conf.textContent, /\[Id 11, 22\]/); // para achar no formulário
-  assert.match(conf.textContent, /Categoria Pública valendo zero, igual ao Power BI/);
+  assert.doesNotMatch(conf.textContent, /Pública valendo zero/); // a Pública vale a tarifa dela em todos os quadros
   assert.match(conf.textContent, /Comércio popular contado como Comercial/);
   assert.match(conf.textContent, /igualPowerBI: false/);
   assert.match(conf.className, /\bso-tela\b/); // a conferência é só da tela: o CSS de impressão a esconde do PDF
@@ -506,10 +505,10 @@ test('tela: sem lançamentos no período os quadros dizem isso e a conferência 
   assert.match(alvo.textContent.replace(/ /g, ' '), /Saldo do períodoR\$ 0,00/);
 });
 
-test('quadros de categoria: o nome certo no lugar de "Outros" (sem fins lucrativos, CadÚnico, o texto como foi escrito)', () => {
+test('quadros de categoria: o nome certo no lugar de "Outros" (sem fins lucrativos é Pública, CadÚnico, o texto como foi escrito)', () => {
   const n = T.nomeCategoria;
   const casos = [
-    ['SEM FINS LUCRATIVOS', 'Sem fins lucrativos'], ['ENT.S/FIM LUCRATIVO', 'Sem fins lucrativos'], ['ENTIDADE SEM FINS LUCRATIVOS', 'Sem fins lucrativos'],
+    ['SEM FINS LUCRATIVOS', 'Pública'], ['ENT.S/FIM LUCRATIVO', 'Pública'], ['ENTIDADE SEM FINS LUCRATIVOS', 'Pública'], // é a mesma coisa
     ['CADÚNICO', 'CadÚnico'], ['Cadunico', 'CadÚnico'],
     ['BAIRRO LEGAL', 'Bairro legal'], ['Bairro Legal', 'Bairro Legal'], // o texto, como foi escrito (só tira o MAIÚSCULO inteiro)
     ['Residencial', 'Residencial'], ['Social', 'Social'], ['P. Comercio', 'P. Comércio'], ['Publica', 'Pública'], ['COMÉRCIO POPULAR', 'Comercial'],
@@ -517,7 +516,8 @@ test('quadros de categoria: o nome certo no lugar de "Outros" (sem fins lucrativ
   ];
   for (const [txt, esperado] of casos) assert.equal(n(txt), esperado, String(txt));
   // o texto livre do DE/PARA continua com "Outros": só os quadros de categoria ganham o nome
-  assert.equal(T.categoriaDe('SEM FINS LUCRATIVOS'), 'Outros');
+  assert.equal(T.categoriaDe('CADÚNICO'), 'Outros');
+  assert.equal(T.categoriaDe('SEM FINS LUCRATIVOS'), 'Pública'); // esta tem tarifa: vale também no DE/PARA
 });
 
 test('o nome certo não muda nenhum valor: continua sem tarifa (zero), até alguém informar a tarifa', () => {
@@ -525,18 +525,18 @@ test('o nome certo não muda nenhum valor: continua sem tarifa (zero), até algu
     { id: 1, fim: '2026-09-10T10:00:00', inicio: '2026-09-10T09:50:00', frente: 'Cadastro', anterior, atual, qtd },
   ]).limpas);
   const linha = (quadro, a) => a.quadros[quadro].linhas[0];
-  // Residencial -> entidade sem fins lucrativos: 1 × (0 − 85,41), decremento
+  // Residencial -> entidade sem fins lucrativos (Pública): 1 × (129,16 − 85,41), incremento
   let a = T.analisar(lanc('Residencial', 'ENTIDADE SEM FINS LUCRATIVOS', 1));
-  assert.deepEqual([linha('decCat', a).de, linha('decCat', a).para, linha('decCat', a).valor], ['Residencial', 'Sem fins lucrativos', -85.41]);
-  assert.equal(a.conferencia.semTarifa, 1);
+  assert.deepEqual([linha('incCat', a).de, linha('incCat', a).para, linha('incCat', a).valor], ['Residencial', 'Pública', 43.75]);
+  assert.equal(a.conferencia.semTarifa, 0);
   // CadÚnico -> Social: 7 × (30,12 − 0), incremento
   a = T.analisar(lanc('CADÚNICO', 'Social', 7));
   assert.deepEqual([linha('incCat', a).de, linha('incCat', a).para, linha('incCat', a).valor], ['CadÚnico', 'Social', 210.84]);
   assert.equal(a.conferencia.semTarifa, 1);
   // com a tarifa informada em regras.js (com este mesmo nome), o valor passa a usá-la
-  comRegra({ tarifas: Object.assign({}, CV.regras.tratativas.tarifas, { 'Sem fins lucrativos': 85.41 }) }, () => {
-    const b = T.analisar(lanc('Residencial', 'SEM FINS LUCRATIVOS', 1));
-    assert.equal(b.quadros.decCat.linhas.length, 0); // mesma tarifa dos dois lados: nada a valorar
+  comRegra({ tarifas: Object.assign({}, CV.regras.tratativas.tarifas, { 'CadÚnico': 30.12 }) }, () => {
+    const b = T.analisar(lanc('CADÚNICO', 'Social', 7));
+    assert.equal(b.quadros.incCat.linhas.length, 0); // mesma tarifa dos dois lados: nada a valorar
     assert.equal(b.conferencia.semTarifa, 0);
   });
   // um texto de categoria qualquer aparece como foi escrito, também sem tarifa
@@ -572,9 +572,9 @@ test('total do saldo por mês: soma cada coluna em centavos (sem erro de ponto f
   const { linhas } = await carregar();
   const meses = T.porMes(linhas);
   const t = T.totalDosMeses(meses);
-  assert.deepEqual([t.incEco, t.incCat, t.decEco, t.decCat], [1399.6, 2887.58, -341.64, -4127.87]); // 85,41 + 1.314,19 etc.
-  assert.equal(t.saldo, -182.33); // −25,17 + (−157,16)
-  assert.equal(t.anual, -521.82); // −50,34 + (−471,48)
+  assert.deepEqual([t.incEco, t.incCat, t.decEco, t.decCat], [1399.6, 2931.33, -341.64, -3913.3]); // 85,41 + 1.314,19 etc.
+  assert.equal(t.saldo, 75.99); // −25,17 + 101,16
+  assert.equal(t.anual, 253.14); // −50,34 + 303,48
   assert.equal(Math.round((t.incEco + t.incCat + t.decEco + t.decCat) * 100), Math.round(t.saldo * 100)); // as quatro colunas fecham com o saldo
   assert.equal(t.lancamentos, meses.reduce((s, m) => s + m.lancamentos, 0));
   assert.equal(t.rotulo, 'Total');
@@ -589,7 +589,7 @@ test('tela: o saldo por mês termina numa linha Total com a soma de cada coluna,
   const bloco = secao(alvo, 'Saldo por mês');
   const meses = textoTabela(bloco);
   assert.equal(meses.length, 4); // cabeçalho, OUT, SET e o total (na base)
-  assert.deepEqual(meses[3], ['Total', 'R$ 1.399,60', 'R$ 2.887,58', '-R$ 341,64', '-R$ 4.127,87', '-R$ 182,33', '-R$ 521,82']);
+  assert.deepEqual(meses[3], ['Total', 'R$ 1.399,60', 'R$ 2.931,33', '-R$ 341,64', '-R$ 3.913,30', 'R$ 75,99', 'R$ 253,14']);
   const linhasTr = bloco.porTag('tr');
   assert.match(linhasTr[linhasTr.length - 1].className, /\btotal\b/);
   assert.match(linhasTr[linhasTr.length - 1].className, /\bembaixo\b/);
@@ -609,7 +609,7 @@ test('Excel do saldo por mês: a última linha é o total', async () => {
   assert.equal(aba.linhas.length, meses.length + 1);
   const total = aba.linhas[aba.linhas.length - 1];
   const val = (titulo) => aba.colunas.find((c) => c.titulo === titulo).valor(total);
-  assert.deepEqual([val('Mês'), val('Saldo'), val('Faturado no ano'), val('Meses até dezembro')], ['Total', -182.33, -521.82, null]);
+  assert.deepEqual([val('Mês'), val('Saldo'), val('Faturado no ano'), val('Meses até dezembro')], ['Total', 75.99, 253.14, null]);
   assert.equal(CV.exporta.abaMeses([]).linhas.length, 0);
   // vira arquivo e volta
   const blob = await CV.xlsxw.gerar([aba]);
